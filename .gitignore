@@ -137,3 +137,18 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Build output
+apps/bot/dist/
+apps/web/dist/
+apps/bot/public/
+
+# Local env files (all .env except .env.example)
+apps/bot/.env
+apps/bot/.env.local
+apps/bot/.env.*.local
+apps/web/.env
+apps/web/.env.local
+
+# Test coverage
+apps/*/coverage/

@@ -1,0 +1,23 @@
+{
+  "name": "arab-tili-yordamchi-bot",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "bot:dev": "npm run dev --workspace=apps/bot",
+    "bot:build": "npm run build --workspace=apps/bot",
+    "bot:start": "npm run start:prod --workspace=apps/bot",
+    "web:dev": "npm run dev --workspace=apps/web",
+    "web:build": "npm run build --workspace=apps/web",
+    "migrate": "npm run migrate --workspace=apps/bot",
+    "migrate:rollback": "npm run migrate:rollback --workspace=apps/bot",
+    "seed": "npm run seed --workspace=apps/bot",
+    "dev": "concurrently \"npm run bot:dev\" \"npm run web:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

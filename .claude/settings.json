@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx:*)",
+      "Bash(npm install:*)",
+      "Bash(npm view:*)",
+      "Bash(npm search:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run migrate:*)",
+      "Bash(npm run seed:*)",
+      "Bash(node -e:*)",
+      "Bash(node:*)",
+      "Bash(timeout 15 npm run dev:*)",
+      "Read(//Users/sherali/Desktop/Dev/tgbots/test-bot/apps/bot/**)",
+      "Bash(__NEW_LINE_fb527eb019e9093b__ echo \"\")",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)"
+    ]
+  }
+}
