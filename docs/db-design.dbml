@@ -1,0 +1,353 @@
+// ============================================================
+// ARAB TILI YORDAMCHI BOT — Database Design
+// Generated: 2026-02-22
+// Stack: PostgreSQL + knex
+// Paste into https://dbdiagram.io/d to render the ERD
+// ============================================================
+
+//// ----------------------------------------------------------
+//// SETTINGS
+//// ----------------------------------------------------------
+Table settings {
+  id            serial       [pk, increment]
+  key           varchar(100) [unique, not null, note: 'e.g. super_admin_password, admin_shared_password']
+  value         text         [not null]
+  updated_at    timestamp    [not null, default: `now()`]
+
+  Note: 'Global key-value configuration store. Passwords stored as bcrypt hashes.'
+}
+
+//// ----------------------------------------------------------
+//// STICKERS
+//// ----------------------------------------------------------
+Table stickers {
+  id            serial       [pk, increment]
+  type          varchar(20)  [not null, note: '"correct" or "wrong"']
+  file_id       varchar(200) [not null, note: 'Telegram sticker file_id']
+  created_at    timestamp    [not null, default: `now()`]
+
+  indexes {
+    type [name: 'idx_stickers_type']
+  }
+
+  Note: 'Pool of sticker file_ids, randomly selected when user answers correctly or incorrectly.'
+}
+
+//// ----------------------------------------------------------
+//// USERS
+//// ----------------------------------------------------------
+Table users {
+  id                  bigserial    [pk]
+  telegram_id         bigint       [unique, not null]
+  first_name          varchar(100) [null]
+  last_name           varchar(100) [null]
+  name_script         varchar(20)  [null, note: '"latin", "cyrillic", or "arabic" — no mixing allowed']
+  registration_state  varchar(30)  [not null, default: 'not_registered', note: '"not_registered" | "name_entered" | "confirmed"']
+  is_blocked          boolean      [not null, default: false]
+  created_at          timestamp    [not null, default: `now()`]
+  updated_at          timestamp    [not null, default: `now()`]
+
+  indexes {
+    telegram_id [name: 'idx_users_telegram_id']
+    registration_state [name: 'idx_users_registration_state']
+  }
+
+  Note: 'Telegram users. registration_state is the state-machine field for the onboarding flow.'
+}
+
+//// ----------------------------------------------------------
+//// ADMINS
+//// ----------------------------------------------------------
+Table admins {
+  id                    serial       [pk, increment]
+  telegram_id           bigint       [unique, not null]
+  role                  varchar(20)  [not null, note: '"super" or "regular"']
+  is_approved           boolean      [not null, default: false, note: 'super admin must approve regular admins']
+  is_blocked            boolean      [not null, default: false, note: 'blocked after 3 failed password attempts']
+  failed_attempt_count  smallint     [not null, default: 0]
+  password_hash         varchar(255) [null, note: 'bcrypt hash — super admin sets own password first']
+  created_at            timestamp    [not null, default: `now()`]
+  updated_at            timestamp    [not null, default: `now()`]
+
+  indexes {
+    telegram_id [name: 'idx_admins_telegram_id']
+    role [name: 'idx_admins_role']
+  }
+
+  Note: 'Admin accounts. Super admin telegram_id is hardcoded in app config (.env). Regular admins need super admin approval.'
+}
+
+//// ----------------------------------------------------------
+//// SECTIONS  (infinitely nested via self-reference)
+//// ----------------------------------------------------------
+Table sections {
+  id                      bigserial    [pk]
+  parent_id               bigint       [null, ref: > sections.id, note: 'NULL = top-level section']
+  title                   varchar(255) [not null]
+  description             text         [null]
+  sort_order              integer      [not null, default: 0, note: 'display order within parent']
+  is_locked_by_default    boolean      [not null, default: false]
+  unlock_required_section bigint       [null, ref: > sections.id, note: 'this section unlocks when that section avg >= 90%']
+  is_deleted              boolean      [not null, default: false]
+  created_at              timestamp    [not null, default: `now()`]
+  updated_at              timestamp    [not null, default: `now()`]
+
+  indexes {
+    parent_id [name: 'idx_sections_parent_id']
+    unlock_required_section [name: 'idx_sections_unlock_required']
+    (parent_id, sort_order) [name: 'idx_sections_parent_order']
+  }
+
+  Note: 'Recursive content hierarchy (papka ichida papka). unlock_required_section points to the prerequisite section.'
+}
+
+//// ----------------------------------------------------------
+//// SECTION UNLOCKS  (per-user, permanent, one-way)
+//// ----------------------------------------------------------
+Table section_unlocks {
+  id          bigserial  [pk]
+  user_id     bigint     [not null, ref: > users.id]
+  section_id  bigint     [not null, ref: > sections.id]
+  unlocked_at timestamp  [not null, default: `now()`]
+
+  indexes {
+    (user_id, section_id) [unique, name: 'uq_section_unlocks_user_section']
+    section_id [name: 'idx_section_unlocks_section']
+  }
+
+  Note: 'Immutable per-user unlock record for sections. Once inserted, never deleted and never re-locks.'
+}
+
+//// ----------------------------------------------------------
+//// TOPICS  (leaf nodes of the content tree)
+//// ----------------------------------------------------------
+Table topics {
+  id                    bigserial    [pk]
+  section_id            bigint       [not null, ref: > sections.id]
+  title                 varchar(255) [not null]
+  description           text         [null]
+  sort_order            integer      [not null, default: 0]
+  time_per_question_sec smallint     [not null, default: 30, note: '5–60 seconds in steps of 5, same for all questions in topic']
+  options_count         smallint     [not null, default: 4, note: '3 or 4 — admin sets per topic']
+  daily_attempt_limit   smallint     [not null, default: 3]
+  is_locked_by_default  boolean      [not null, default: false]
+  unlock_required_topic bigint       [null, ref: > topics.id, note: 'this topic unlocks when that topic best score >= 90%']
+  is_deleted            boolean      [not null, default: false]
+  created_at            timestamp    [not null, default: `now()`]
+  updated_at            timestamp    [not null, default: `now()`]
+
+  indexes {
+    section_id [name: 'idx_topics_section_id']
+    unlock_required_topic [name: 'idx_topics_unlock_required']
+    (section_id, sort_order) [name: 'idx_topics_section_order']
+  }
+
+  Note: 'Leaf nodes of the content tree (testlar). unlock_required_topic points to prerequisite topic.'
+}
+
+//// ----------------------------------------------------------
+//// TOPIC UNLOCKS  (per-user, permanent, one-way)
+//// ----------------------------------------------------------
+Table topic_unlocks {
+  id          bigserial  [pk]
+  user_id     bigint     [not null, ref: > users.id]
+  topic_id    bigint     [not null, ref: > topics.id]
+  unlocked_at timestamp  [not null, default: `now()`]
+
+  indexes {
+    (user_id, topic_id) [unique, name: 'uq_topic_unlocks_user_topic']
+    topic_id [name: 'idx_topic_unlocks_topic']
+  }
+
+  Note: 'Immutable per-user unlock record for topics. Once inserted, never deleted and never re-locks.'
+}
+
+//// ----------------------------------------------------------
+//// QUESTIONS
+//// ----------------------------------------------------------
+Table questions {
+  id            bigserial    [pk]
+  topic_id      bigint       [not null, ref: > topics.id]
+  body_text     text         [null, note: 'at least one of body_text or media_file_id must be set']
+  media_type    varchar(20)  [null, note: '"image" | "audio" | "video" | NULL']
+  media_file_id varchar(200) [null, note: 'Telegram file_id for the media attachment']
+  sort_order    integer      [not null, default: 0]
+  is_deleted    boolean      [not null, default: false]
+  created_at    timestamp    [not null, default: `now()`]
+  updated_at    timestamp    [not null, default: `now()`]
+
+  indexes {
+    topic_id [name: 'idx_questions_topic_id']
+    (topic_id, is_deleted) [name: 'idx_questions_topic_active']
+  }
+
+  Note: 'Questions supporting text + optional media. Soft-deleted so existing test_answers remain readable.'
+}
+
+//// ----------------------------------------------------------
+//// ANSWER OPTIONS
+//// ----------------------------------------------------------
+Table answer_options {
+  id           bigserial    [pk]
+  question_id  bigint       [not null, ref: > questions.id]
+  body_text    text         [not null]
+  is_correct   boolean      [not null, default: false]
+  sort_order   smallint     [not null, default: 0]
+  is_deleted   boolean      [not null, default: false]
+  created_at   timestamp    [not null, default: `now()`]
+
+  indexes {
+    question_id [name: 'idx_answer_options_question_id']
+    (question_id, is_correct) [name: 'idx_answer_options_correct']
+  }
+
+  Note: '3 or 4 options per question. Exactly one is_correct = true. Soft-deleted for historical integrity.'
+}
+
+//// ----------------------------------------------------------
+//// TEST SESSIONS  (one row per attempt)
+//// ----------------------------------------------------------
+Table test_sessions {
+  id                    bigserial    [pk]
+  user_id               bigint       [not null, ref: > users.id]
+  topic_id              bigint       [not null, ref: > topics.id, note: 'kept even if topic soft-deleted']
+  status                varchar(20)  [not null, default: 'in_progress', note: '"in_progress" | "completed" | "abandoned"']
+  total_questions       smallint     [not null]
+  correct_count         smallint     [not null, default: 0]
+  wrong_count           smallint     [not null, default: 0]
+  score_percent         numeric(5,2) [not null, default: 0, note: 'correct_count / total_questions * 100']
+  attempt_date_tashkent date         [not null, note: 'calendar date in Asia/Tashkent (UTC+5) — set at session start']
+  started_at            timestamp    [not null, default: `now()`]
+  finished_at           timestamp    [null]
+
+  indexes {
+    user_id [name: 'idx_test_sessions_user_id']
+    topic_id [name: 'idx_test_sessions_topic_id']
+    (user_id, topic_id, attempt_date_tashkent) [name: 'idx_test_sessions_daily']
+    (user_id, started_at) [name: 'idx_test_sessions_user_history']
+    (user_id, topic_id, score_percent) [name: 'idx_test_sessions_best_score']
+  }
+
+  Note: 'One row per test attempt. Results are permanent even after topic/question deletion. Abandoned sessions count as an attempt.'
+}
+
+//// ----------------------------------------------------------
+//// TEST ANSWERS  (per-question record with text snapshots)
+//// ----------------------------------------------------------
+Table test_answers {
+  id                  bigserial  [pk]
+  session_id          bigint     [not null, ref: > test_sessions.id]
+  question_id         bigint     [not null, ref: > questions.id, note: 'FK kept for traceability; question may be soft-deleted']
+  question_snapshot   text       [not null, note: 'copy of question body_text at time of answering']
+  chosen_option_id    bigint     [null, ref: > answer_options.id, note: 'NULL = unanswered (session abandoned before this question)']
+  chosen_option_text  text       [null, note: 'copy of chosen option text — survives option deletion']
+  correct_option_text text       [not null, note: 'copy of correct option text — survives option deletion']
+  is_correct          boolean    [not null, default: false]
+  answered_at         timestamp  [null, note: 'NULL = unanswered']
+  time_spent_sec      smallint   [null]
+
+  indexes {
+    session_id [name: 'idx_test_answers_session_id']
+    (session_id, question_id) [unique, name: 'uq_test_answers_session_question']
+  }
+
+  Note: 'Snapshot-based answer record. Unanswered rows (abandoned) have chosen_option_id = NULL and is_correct = false.'
+}
+
+//// ----------------------------------------------------------
+//// DAILY ATTEMPT COUNTS  (enforces 3/day limit)
+//// ----------------------------------------------------------
+Table daily_attempt_counts {
+  id           bigserial  [pk]
+  user_id      bigint     [not null, ref: > users.id]
+  topic_id     bigint     [not null, ref: > topics.id]
+  attempt_date date       [not null, note: 'calendar date in Asia/Tashkent (UTC+5)']
+  count        smallint   [not null, default: 1]
+
+  indexes {
+    (user_id, topic_id, attempt_date) [unique, name: 'uq_daily_attempt_counts']
+  }
+
+  Note: 'UPSERT on each new session start: INSERT ... ON CONFLICT DO UPDATE SET count = count + 1. Natural daily reset via date column — no cron needed.'
+}
+
+//// ----------------------------------------------------------
+//// SUPPORT THREADS
+//// ----------------------------------------------------------
+Table support_threads {
+  id          bigserial   [pk]
+  user_id     bigint      [not null, ref: > users.id]
+  status      varchar(20) [not null, default: 'open', note: '"open" | "claimed" | "closed"']
+  claimed_by  integer     [null, ref: > admins.id, note: 'first admin to respond claims the thread']
+  created_at  timestamp   [not null, default: `now()`]
+  updated_at  timestamp   [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_support_threads_user_id']
+    status [name: 'idx_support_threads_status']
+    claimed_by [name: 'idx_support_threads_claimed_by']
+  }
+
+  Note: 'One thread per user support conversation. claimed_by transitions from NULL → admin.id atomically. Super admin can overwrite.'
+}
+
+//// ----------------------------------------------------------
+//// SUPPORT MESSAGES
+//// ----------------------------------------------------------
+Table support_messages {
+  id            bigserial    [pk]
+  thread_id     bigint       [not null, ref: > support_threads.id]
+  sender_type   varchar(10)  [not null, note: '"user" or "admin"']
+  sender_id     bigint       [not null, note: 'users.telegram_id if sender_type=user; admins.id if sender_type=admin']
+  body_text     text         [null]
+  media_type    varchar(20)  [null, note: '"image" | "file" | "audio" | "voice" — admin only']
+  media_file_id varchar(200) [null]
+  sent_at       timestamp    [not null, default: `now()`]
+
+  indexes {
+    thread_id [name: 'idx_support_messages_thread_id']
+    (thread_id, sent_at) [name: 'idx_support_messages_thread_time']
+  }
+
+  Note: 'Users send text-only. Admins send text/image/file/audio/voice. User-facing view shows last 10 messages per thread.'
+}
+
+//// ----------------------------------------------------------
+//// GUIDE ITEMS  (Qo\'llanma)
+//// ----------------------------------------------------------
+Table guide_items {
+  id            serial       [pk, increment]
+  content_type  varchar(10)  [not null, note: '"text" or "video"']
+  body_text     text         [null, note: 'populated when content_type = "text"']
+  media_file_id varchar(200) [null, note: 'Telegram file_id when content_type = "video"']
+  sort_order    smallint     [not null, note: 'admin-defined display order; max 20 rows enforced at app layer']
+  is_active     boolean      [not null, default: true]
+  created_at    timestamp    [not null, default: `now()`]
+  updated_at    timestamp    [not null, default: `now()`]
+
+  indexes {
+    sort_order [name: 'idx_guide_items_sort_order']
+  }
+
+  Note: 'Up to 20 ordered guide items. On user request, old guide messages deleted and new ones sent in sort_order sequence.'
+}
+
+//// ----------------------------------------------------------
+//// ANNOUNCEMENTS  (E\'lon)
+//// ----------------------------------------------------------
+Table announcements {
+  id            bigserial    [pk]
+  created_by    integer      [not null, ref: > admins.id]
+  body_text     text         [null]
+  media_type    varchar(20)  [null, note: '"image" | "video" | "file" | NULL']
+  media_file_id varchar(200) [null]
+  expires_at    timestamp    [not null, note: 'set to created_at + interval \'24 hours\' by application']
+  created_at    timestamp    [not null, default: `now()`]
+
+  indexes {
+    expires_at [name: 'idx_announcements_expires_at']
+    created_by [name: 'idx_announcements_created_by']
+  }
+
+  Note: 'Admin broadcast messages. expires_at enforced at application layer (WHERE expires_at > now()). Deletion attempted from all users after 24h.'
+}

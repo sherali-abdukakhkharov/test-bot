@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Arab Tili Bot — Flow Canvas</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0f1117; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #1a1d27; }
+  ::-webkit-scrollbar-thumb { background: #3d4463; border-radius: 3px; }
+  .phone-shadow { box-shadow: 0 0 0 2px #2a2d3a, 0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(100,120,255,0.08); }
+  .flow-canvas { background: #0f1117; background-image: radial-gradient(circle at 1px 1px, #1e2130 1px, transparent 0); background-size: 32px 32px; }
+  .tab-active { background: linear-gradient(135deg, #4f6ef7, #7c5ce8); }
+  .badge-green { background: linear-gradient(135deg, #00b894, #00cec9); }
+  .badge-red { background: linear-gradient(135deg, #d63031, #e84393); }
+  .badge-yellow { background: linear-gradient(135deg, #fdcb6e, #e17055); }
+  .tg-blue { background: #2b5278; }
+  .tg-green { background: #2e7d32; }
+  .tg-header { background: #17212b; }
+  .tg-bg { background: #0e1621; }
+  .tg-inline-btn { background: #1c2d3f; border: 1px solid #2b5278; transition: background 0.15s; }
+  .tg-inline-btn:hover { background: #243447; }
+  .tg-reply-btn { background: #1c2d3f; border: 1px solid #243447; transition: background 0.15s; }
+  .tg-reply-btn:hover { background: #243447; }
+  .screen-card { background: #13161f; border: 1px solid #1e2130; border-radius: 16px; transition: transform 0.2s; }
+  .screen-card:hover { transform: translateY(-2px); }
+  .arrow-line { stroke: #4f6ef7; stroke-dasharray: 8,4; stroke-width: 2; fill: none; }
+  .section-header { background: linear-gradient(135deg, #1a1d2e, #13161f); border-left: 3px solid #4f6ef7; }
+  .legend-item { background: #13161f; border: 1px solid #1e2130; }
+  .flow-label { background: #1a1d2e; border: 1px solid #4f6ef7; color: #7c9de8; font-size: 10px; }
+  .sticker-correct { background: linear-gradient(135deg, #00b894, #55efc4); }
+  .sticker-wrong { background: linear-gradient(135deg, #d63031, #ff7675); }
+  .progress-bar-bg { background: #1a2332; }
+  .progress-bar-fill { background: linear-gradient(90deg, #4f6ef7, #7c5ce8); }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+  .tag-inline { background: #1c3a6e; color: #7cb9e8; }
+  .tag-reply { background: #1e3a2e; color: #55efc4; }
+  .tag-text { background: #2a2a1e; color: #fdcb6e; }
+  .tag-sticker { background: #3a1e3a; color: #fd79a8; }
+  .tag-media { background: #1e2a3a; color: #74b9ff; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+  .node-box { border-radius: 10px; padding: 10px 14px; font-size: 12px; font-weight: 600; }
+  .node-section { background: #1c2d4a; border: 2px solid #4f6ef7; color: #7cb9e8; }
+  .node-topic { background: #1e3a2e; border: 2px solid #00b894; color: #55efc4; }
+  .node-locked { background: #2a1e1e; border: 2px solid #d63031; color: #ff7675; }
+  .connector { stroke: #4f6ef7; stroke-width: 1.5; fill: none; marker-end: url(#arr); }
+  .connector-red { stroke: #d63031; stroke-width: 1.5; fill: none; stroke-dasharray: 5,3; marker-end: url(#arr-red); }
+</style>
+</head>
+<body>
+<script type="text/babel">
+
+const { useState } = React;
+
+// ─── Primitives ────────────────────────────────────────────────────────────
+
+const Tag = ({ type, label }) => {
+  const cls = { inline: 'tag-inline', reply: 'tag-reply', text: 'tag-text', sticker: 'tag-sticker', media: 'tag-media' };
+  return <span className={`tag ${cls[type] || 'tag-text'}`}>{label}</span>;
+};
+
+const BotBubble = ({ children, tags = [] }) => (
+  <div className="flex items-end gap-2 mb-2">
+    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs flex-shrink-0 mt-auto" style={{fontSize:10}}>🤖</div>
+    <div className="tg-blue rounded-2xl rounded-bl-sm px-3 py-2 max-w-[85%]">
+      <div className="text-gray-100 text-xs leading-relaxed">{children}</div>
+      {tags.length > 0 && <div className="flex flex-wrap gap-1 mt-1">{tags.map((t,i)=><Tag key={i} {...t}/>)}</div>}
+      <div className="text-right text-gray-400 mt-0.5" style={{fontSize:9}}>12:34 ✓</div>
+    </div>
+  </div>
+);
+
+const UserBubble = ({ children }) => (
+  <div className="flex justify-end mb-2">
+    <div className="tg-green rounded-2xl rounded-br-sm px-3 py-2 max-w-[80%]">
+      <div className="text-gray-100 text-xs leading-relaxed">{children}</div>
+      <div className="text-right text-green-300 mt-0.5" style={{fontSize:9}}>12:33 ✓✓</div>
+    </div>
+  </div>
+);
+
+const InlineKeyboard = ({ rows }) => (
+  <div className="mt-1 space-y-1">
+    {rows.map((row, i) => (
+      <div key={i} className="flex gap-1">
+        {row.map((btn, j) => (
+          <button key={j} className="tg-inline-btn rounded-lg px-2 py-1.5 text-blue-300 text-center flex-1 cursor-default" style={{fontSize:10, fontWeight:500}}>
+            {btn}
+          </button>
+        ))}
+      </div>
+    ))}
+  </div>
+);
+
+const ReplyKeyboard = ({ rows }) => (
+  <div className="border-t border-gray-700 pt-2 pb-1 space-y-1 px-1" style={{background:'#17212b'}}>
+    <div style={{fontSize:9, color:'#4a5568', marginBottom:4, paddingLeft:4}}>⌨ Reply Keyboard</div>
+    {rows.map((row, i) => (
+      <div key={i} className="flex gap-1">
+        {row.map((btn, j) => (
+          <button key={j} className="tg-reply-btn rounded-lg px-2 py-2 text-gray-200 text-center flex-1 cursor-default" style={{fontSize:10, fontWeight:500}}>
+            {btn}
+          </button>
+        ))}
+      </div>
+    ))}
+  </div>
+);
+
+const PhoneFrame = ({ title = "Arab Tili Bot", children, width = 220, height = 420 }) => (
+  <div className="phone-shadow rounded-3xl overflow-hidden flex flex-col flex-shrink-0" style={{width, height, background:'#17212b', border:'3px solid #2a2d3a'}}>
+    {/* Status bar */}
+    <div className="flex items-center justify-between px-3 py-1" style={{background:'#0e1621', fontSize:9, color:'#6b7280'}}>
+      <span>9:41</span>
+      <span>● ● ●</span>
+    </div>
+    {/* Chat header */}
+    <div className="tg-header flex items-center gap-2 px-3 py-2 flex-shrink-0">
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs">🤖</div>
+      <div>
+        <div className="text-white font-semibold" style={{fontSize:11}}>{title}</div>
+        <div className="text-green-400" style={{fontSize:9}}>● online</div>
+      </div>
+    </div>
+    {/* Chat area */}
+    <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-2 tg-bg" style={{scrollbarWidth:'thin'}}>
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
+const ScreenCard = ({ label, sublabel, children, width = 220, height = 420, note }) => (
+  <div className="screen-card p-3 flex flex-col items-center gap-2 flex-shrink-0" style={{minWidth: width + 24}}>
+    <div className="text-center">
+      <div className="text-white font-semibold" style={{fontSize:11}}>{label}</div>
+      {sublabel && <div className="text-gray-500" style={{fontSize:9}}>{sublabel}</div>}
+    </div>
+    {children}
+    {note && <div className="text-center text-yellow-400 italic" style={{fontSize:9, maxWidth:width}}>{note}</div>}
+  </div>
+);
+
+const Arrow = ({ label = "" }) => (
+  <div className="flex flex-col items-center justify-center flex-shrink-0 gap-1 self-center" style={{width:50}}>
+    {label && <div className="flow-label rounded px-1 py-0.5 text-center whitespace-nowrap">{label}</div>}
+    <svg width="50" height="20" viewBox="0 0 50 20">
+      <defs><marker id="ah" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L6,3 z" fill="#4f6ef7"/></marker></defs>
+      <line x1="0" y1="10" x2="44" y2="10" className="arrow-line" markerEnd="url(#ah)"/>
+    </svg>
+  </div>
+);
+
+const SectionTitle = ({ icon, title, subtitle }) => (
+  <div className="section-header rounded-lg p-3 mb-6">
+    <div className="flex items-center gap-2">
+      <span style={{fontSize:20}}>{icon}</span>
+      <div>
+        <h2 className="text-white font-bold" style={{fontSize:16}}>{title}</h2>
+        {subtitle && <p className="text-gray-400" style={{fontSize:11}}>{subtitle}</p>}
+      </div>
+    </div>
+  </div>
+);
+
+const Legend = () => (
+  <div className="flex flex-wrap gap-2 mb-6">
+    {[
+      {type:'inline', label:'Inline Keyboard Button'},
+      {type:'reply', label:'Reply Keyboard Button'},
+      {type:'text', label:'Text Message'},
+      {type:'sticker', label:'Sticker'},
+      {type:'media', label:'Media Message'},
+    ].map((item,i) => (
+      <div key={i} className="legend-item rounded-lg px-3 py-1.5 flex items-center gap-2">
+        <Tag {...item} />
+        <span className="text-gray-400" style={{fontSize:10}}>{item.label}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const Divider = ({ label }) => (
+  <div className="flex items-center gap-3 my-6">
+    <div className="flex-1 h-px" style={{background:'#1e2130'}}/>
+    {label && <span className="text-gray-500 text-xs px-2">{label}</span>}
+    <div className="flex-1 h-px" style={{background:'#1e2130'}}/>
+  </div>
+);
+
+// ─── Tab 1: Registration ────────────────────────────────────────────────────
+
+const RegistrationTab = () => (
+  <div>
+    <SectionTitle icon="📋" title="Registration Flow" subtitle="New user onboarding — state machine from /start to confirmed registration" />
+    <Legend />
+
+    <div className="overflow-x-auto pb-4">
+      <div className="flex items-start gap-3" style={{minWidth:1100}}>
+
+        <ScreenCard label="1. First /start" sublabel="New user" note="No buttons shown yet">
+          <PhoneFrame>
+            <UserBubble>/start</UserBubble>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              🇸🇦 <strong>Arab Tili Yordamchi Bot</strong>{"\n"}
+              Bu bot Zaman Akademiyasi tomonidan yaratilgan. Harflardan jumlalargacha bosqichma-bosqich o'rganing!
+            </BotBubble>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              Iltimos, botdan foydalanish uchun ism-familiyangiz bilan ro'yxatdan o'ting.
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+
+        <Arrow label="invalid input" />
+
+        <ScreenCard label="2. Invalid Input" sublabel="Emoji / number / command" note="Loop until valid name">
+          <PhoneFrame>
+            <UserBubble>😊😊😊</UserBubble>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              ❗ Iltimos, ism-familiyangizni kiriting.{"\n"}
+              <span style={{color:'#9ca3af', fontSize:9}}>Namuna: Abdulloh Karimov</span>
+            </BotBubble>
+            <UserBubble>/help</UserBubble>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              ❗ Iltimos, ism-familiyangizni kiriting.
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+
+        <Arrow label="valid name" />
+
+        <ScreenCard label="3. Name Confirmation" sublabel="Inline buttons shown" note="Inline keyboard inside message">
+          <PhoneFrame>
+            <UserBubble>Abdulloh Karimov</UserBubble>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              Sizning ismingiz:{"\n"}
+              <strong>Abdulloh Karimov</strong>{"\n\n"}
+              To'g'rimi?
+              <InlineKeyboard rows={[['✅ Ha', '❌ Yo\'q']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+
+        <div className="flex flex-col gap-3 self-center flex-shrink-0">
+          <Arrow label="✅ Ha" />
+          <Arrow label="❌ Yo'q" />
+        </div>
+
+        <div className="flex flex-col gap-3 flex-shrink-0">
+          <ScreenCard label="4a. Confirmed ✅" sublabel="Main menu appears" note="Reply keyboard replaces phone keyboard" width={220} height={420}>
+            <PhoneFrame>
+              <BotBubble tags={[{type:'reply',label:'Reply'}]}>
+                🎉 Hurmatli <strong>Abdulloh Karimov</strong>, ro'yxatdan o'tdingiz!
+              </BotBubble>
+              <ReplyKeyboard rows={[["📚 Lug'at yodlash"],["📝 Test"],["📊 Natijalarim"],["🏆 Top o'quvchilar"],["📖 Qo'llanma"],["❓ Yordam"]]}/>
+            </PhoneFrame>
+          </ScreenCard>
+
+          <ScreenCard label="4b. Retry ❌" sublabel="Back to name input" note="Loop back to step 1" width={220} height={200}>
+            <PhoneFrame height={170}>
+              <BotBubble tags={[{type:'text',label:'Text'}]}>
+                Iltimos, ism-familiyangizni namunadagidek qaytadan kiriting.{"\n"}
+                <span style={{color:'#9ca3af',fontSize:9}}>Namuna: Abdulloh Karimov</span>
+              </BotBubble>
+            </PhoneFrame>
+          </ScreenCard>
+        </div>
+
+      </div>
+    </div>
+
+    <Divider label="Returning User" />
+
+    <div className="overflow-x-auto pb-4">
+      <div className="flex items-start gap-3" style={{minWidth:300}}>
+        <ScreenCard label="Returning User /start" sublabel="Already registered" note="Jumps straight to main menu">
+          <PhoneFrame>
+            <UserBubble>/start</UserBubble>
+            <BotBubble tags={[{type:'reply',label:'Reply'}]}>
+              Hurmatli <strong>Abdulloh Karimov</strong>, siz allaqachon ro'yxatdan o'tgansiz. 👋
+            </BotBubble>
+            <ReplyKeyboard rows={[["📚 Lug'at yodlash"],["📝 Test"],["📊 Natijalarim"],["🏆 Top o'quvchilar"],["📖 Qo'llanma"],["❓ Yordam"]]}/>
+          </PhoneFrame>
+        </ScreenCard>
+
+        <div className="self-center p-4 rounded-xl flex-shrink-0" style={{background:'#13161f', border:'1px solid #1e2130', maxWidth:280}}>
+          <div className="text-blue-400 font-semibold mb-2" style={{fontSize:12}}>📋 Name Validation Rules</div>
+          <ul className="space-y-1" style={{fontSize:10, color:'#9ca3af'}}>
+            <li>✅ Latin, Cyrillic, or Arabic scripts</li>
+            <li>✅ Minimum 2 words (first + last)</li>
+            <li>✅ Each word ≥ 3 characters</li>
+            <li>✅ Apostroph (') allowed</li>
+            <li>✅ Auto-capitalize first letter</li>
+            <li>✅ Extra spaces auto-trimmed</li>
+            <li>❌ Numbers or special chars</li>
+            <li>❌ Mixed scripts (Latin + Arabic)</li>
+            <li>❌ Commands starting with /</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Tab 2: Main Menu ───────────────────────────────────────────────────────
+
+const MainMenuTab = () => (
+  <div>
+    <SectionTitle icon="🏠" title="Main Menu" subtitle="Reply Keyboard — 6 buttons, always visible, replaces phone keyboard" />
+    <Legend />
+
+    <div className="flex flex-wrap gap-6 items-start">
+      <ScreenCard label="Main Menu Layout" sublabel="Reply Keyboard (6 rows)" note="Buttons persist — not inside chat bubbles" width={240} height={460}>
+        <PhoneFrame width={240} height={430}>
+          <BotBubble tags={[{type:'reply',label:'Reply Keyboard'}]}>
+            Hurmatli <strong>Abdulloh Karimov</strong>, siz allaqachon ro'yxatdan o'tgansiz. 👋
+          </BotBubble>
+          <ReplyKeyboard rows={[
+            ["📚 Lug'at yodlash"],
+            ["📝 Test"],
+            ["📊 Natijalarim"],
+            ["🏆 Top o'quvchilar"],
+            ["📖 Qo'llanma"],
+            ["❓ Yordam"],
+          ]} />
+        </PhoneFrame>
+      </ScreenCard>
+
+      <div className="flex flex-col gap-3" style={{maxWidth:380}}>
+        <div className="text-white font-semibold mb-1" style={{fontSize:13}}>Button Descriptions</div>
+        {[
+          {icon:"📚",label:"Lug'at yodlash", desc:"Vocabulary learning module (planned for later phase)", color:"#1c3a6e"},
+          {icon:"📝",label:"Test", desc:"Enter the section/topic tree → take timed multiple-choice tests", color:"#1e3a2e"},
+          {icon:"📊",label:"Natijalarim", desc:"View own last 20 test results in chat (no Web App)", color:"#2a2a1e"},
+          {icon:"🏆",label:"Top o'quvchilar", desc:"Leaderboard — top 40 users with 10+ topics, ranked by avg score", color:"#2a1e3a"},
+          {icon:"📖",label:"Qo'llanma", desc:"Guide items sent as messages (text/video, up to 20)", color:"#1e2a3a"},
+          {icon:"❓",label:"Yordam", desc:"Support chat — send text messages to admins", color:"#1a2a1a"},
+        ].map((item,i) => (
+          <div key={i} className="rounded-xl p-3 flex items-start gap-3" style={{background: item.color, border:`1px solid ${item.color.replace(/1[a-f]/,'2a')}` }}>
+            <span style={{fontSize:20}}>{item.icon}</span>
+            <div>
+              <div className="text-white font-semibold" style={{fontSize:11}}>{item.label}</div>
+              <div className="text-gray-300" style={{fontSize:10}}>{item.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="p-4 rounded-xl" style={{background:'#13161f', border:'1px solid #1e2130', maxWidth:280}}>
+        <div className="text-yellow-400 font-semibold mb-3" style={{fontSize:12}}>⌨️ Reply vs Inline Keyboard</div>
+        <div className="space-y-3">
+          <div>
+            <div className="text-green-400 font-semibold mb-1" style={{fontSize:11}}>Reply Keyboard</div>
+            <ul className="space-y-1" style={{fontSize:10, color:'#9ca3af'}}>
+              <li>• Appears below chat, above keyboard</li>
+              <li>• Sends a text message when pressed</li>
+              <li>• Persists across messages</li>
+              <li>• Used for main navigation</li>
+              <li>• Shown via <code style={{color:'#74b9ff'}}>ReplyKeyboardMarkup</code></li>
+            </ul>
+          </div>
+          <div className="h-px" style={{background:'#1e2130'}}/>
+          <div>
+            <div className="text-blue-400 font-semibold mb-1" style={{fontSize:11}}>Inline Keyboard</div>
+            <ul className="space-y-1" style={{fontSize:10, color:'#9ca3af'}}>
+              <li>• Attached to specific message</li>
+              <li>• Sends callback_data (not text)</li>
+              <li>• Can be edited/removed by bot</li>
+              <li>• Used for confirmations & navigation</li>
+              <li>• Shown via <code style={{color:'#74b9ff'}}>InlineKeyboardMarkup</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Tab 3: Test Flow ───────────────────────────────────────────────────────
+
+const TestFlowTab = () => (
+  <div>
+    <SectionTitle icon="📝" title="Test Flow" subtitle="Full test journey: section browse → topic select → pre-test → questions → result" />
+    <Legend />
+
+    <div className="overflow-x-auto pb-4">
+      <div className="flex items-start gap-2" style={{minWidth:1600}}>
+
+        <ScreenCard label="S1. Section List" sublabel="Inline keyboard" note="🔒 locked sections visible but disabled" width={200} height={400}>
+          <PhoneFrame width={200} height={370}>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              📚 Bo'limni tanlang:
+              <InlineKeyboard rows={[
+                ['🔓 1. Harflar'],
+                ['🔓 2. So\'zlar'],
+                ['🔒 3. Jumlalar'],
+                ['⬅️ Orqaga'],
+              ]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+
+        <Arrow label="select section" />
+
+        <ScreenCard label="S2. Sub-section" sublabel="Nested navigation" note="Sections can nest infinitely" width={200} height={400}>
+          <PhoneFrame width={200} height={370}>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              📁 Harflar › Bo'limni tanlang:
+              <InlineKeyboard rows={[
+                ['🔓 Alifbo'],
+                ['🔓 Unlilar'],
+                ['🔒 Undoshlar'],
+                ['⬅️ Orqaga'],
+              ]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+
+        <Arrow label="select topic" />
+
+        <ScreenCard label="S3. Pre-Test Info" sublabel="Topic details + start" note="Shows daily attempts left" width={200} height={400}>
+          <PhoneFrame width={200} height={370}>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              📝 <strong>Alifbo</strong>{"\n\n"}
+              📊 Savollar: <strong>10</strong>{"\n"}
+              ⏱ Vaqt: <strong>15 soniya/savol</strong>{"\n"}
+              🔄 Bugungi imkoniyat: <strong>2/3</strong>
+              <InlineKeyboard rows={[['▶️ Testni boshlash'],['⬅️ Orqaga']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+
+        <Arrow label="start test" />
+
+        <ScreenCard label="S4. Question" sublabel="Timer + answer options" note="Options shuffled each time, old message deleted" width={210} height={400}>
+          <PhoneFrame width={210} height={370}>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              <div className="flex items-center justify-between mb-1">
+                <span style={{fontSize:9}}>Savol <strong>3/10</strong></span>
+                <span style={{fontSize:9, color:'#fdcb6e'}}>⏱ 15s</span>
+              </div>
+              <div className="progress-bar-bg rounded-full overflow-hidden mb-2" style={{height:4}}>
+                <div className="progress-bar-fill rounded-full" style={{width:'30%', height:'100%'}}/>
+              </div>
+              Quyidagi harfni toping:
+              <div className="my-2 rounded-lg overflow-hidden flex items-center justify-center" style={{background:'#1a2332', height:50}}>
+                <span style={{fontSize:28}}>ب</span>
+              </div>
+              <InlineKeyboard rows={[['A) ب','B) ت'],['C) ث','D) ج'],['🛑 To\'xtatish']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+
+        <div className="flex flex-col gap-2 self-center flex-shrink-0">
+          <Arrow label="✅ correct" />
+          <Arrow label="❌ wrong" />
+          <Arrow label="⏰ timeout" />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <ScreenCard label="S5a. Correct" sublabel="Sticker shown 3s" note="Auto-advances to next question" width={180} height={200}>
+            <PhoneFrame width={180} height={170}>
+              <BotBubble tags={[{type:'sticker',label:'Sticker'}]}>
+                <div className="sticker-correct rounded-xl p-3 text-center">
+                  <div style={{fontSize:28}}>✅</div>
+                  <div style={{fontSize:9, color:'white', marginTop:4}}>To'g'ri!</div>
+                </div>
+              </BotBubble>
+            </PhoneFrame>
+          </ScreenCard>
+          <ScreenCard label="S5b. Wrong" sublabel="Sticker shown 3s" note="Counts as wrong answer" width={180} height={200}>
+            <PhoneFrame width={180} height={170}>
+              <BotBubble tags={[{type:'sticker',label:'Sticker'}]}>
+                <div className="sticker-wrong rounded-xl p-3 text-center">
+                  <div style={{fontSize:28}}>❌</div>
+                  <div style={{fontSize:9, color:'white', marginTop:4}}>Xato!</div>
+                </div>
+              </BotBubble>
+            </PhoneFrame>
+          </ScreenCard>
+        </div>
+
+        <Arrow label="after last Q" />
+
+        <ScreenCard label="S7. Result" sublabel="Summary only" note="No per-question breakdown shown" width={200} height={400}>
+          <PhoneFrame width={200} height={370}>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              📊 <strong>Natija</strong>{"\n\n"}
+              📚 Mavzu: <strong>Alifbo</strong>{"\n"}
+              ✅ To'g'ri: <strong>8</strong>{"\n"}
+              ❌ Xato: <strong>2</strong>{"\n"}
+              📈 Foiz: <strong>80%</strong>
+              <InlineKeyboard rows={[['⬅️ Orqaga']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+
+      </div>
+    </div>
+
+    <Divider label="Stop Test Flow" />
+    <div className="overflow-x-auto pb-4">
+      <div className="flex items-start gap-3" style={{minWidth:600}}>
+        <ScreenCard label="Stop Button Pressed" sublabel="During active test" width={210}>
+          <PhoneFrame width={210} height={280}>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              ⚠️ Testni to'xtatsangiz imkoniyat ketadi.{"\n\n"}
+              Davom etamizmi?
+              <InlineKeyboard rows={[['✅ Ha, to\'xtat','❌ Yo\'q']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+        <Arrow label="Ha, to'xtat" />
+        <ScreenCard label="Abandoned" sublabel="Attempt consumed" width={210} note="Unanswered = wrong, score saved">
+          <PhoneFrame width={210} height={280}>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              📊 Test to'xtatildi.{"\n"}
+              ✅ To'g'ri: 3 | ❌ Xato: 7{"\n"}
+              📈 Foiz: 30%
+              <InlineKeyboard rows={[['⬅️ Orqaga']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+        <div className="self-center p-4 rounded-xl flex-shrink-0" style={{background:'#13161f', border:'1px solid #1e2130', maxWidth:260}}>
+          <div className="text-yellow-400 font-semibold mb-2" style={{fontSize:12}}>⚠️ Abandon Rules</div>
+          <ul className="space-y-1" style={{fontSize:10, color:'#9ca3af'}}>
+            <li>• Attempt is consumed (−1 from daily limit)</li>
+            <li>• Unanswered questions → wrong</li>
+            <li>• Score saved permanently to DB</li>
+            <li>• Test answers rows created with is_correct=false</li>
+            <li>• Can retake if attempts remain</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <Divider label="Attempts Exhausted" />
+    <div className="overflow-x-auto pb-4">
+      <div className="flex items-start gap-3">
+        <ScreenCard label="No Attempts Left" sublabel="0/3 for today" note="Start button replaced with message" width={200}>
+          <PhoneFrame width={200} height={320}>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              📝 <strong>Alifbo</strong>{"\n\n"}
+              Savollar: 10{"\n"}
+              Vaqt: 15 soniya{"\n"}
+              🔄 Bugungi imkoniyat: <strong className="text-red-400">0/3</strong>{"\n\n"}
+              ⚠️ Imkoniyatingiz tugagan. Ertaga qayta urinib ko'ring.
+              <InlineKeyboard rows={[['⬅️ Orqaga']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+        <div className="self-center p-4 rounded-xl flex-shrink-0" style={{background:'#13161f', border:'1px solid #1e2130', maxWidth:260}}>
+          <div className="text-blue-400 font-semibold mb-2" style={{fontSize:12}}>🔄 Daily Reset Logic</div>
+          <ul className="space-y-1" style={{fontSize:10, color:'#9ca3af'}}>
+            <li>• 3 attempts per topic per day</li>
+            <li>• Resets at <strong style={{color:'white'}}>00:00 Tashkent time (UTC+5)</strong></li>
+            <li>• No cron needed — uses date column in DB</li>
+            <li>• Each attempt start = UPSERT to daily_attempt_counts</li>
+            <li>• Abandoned attempts still count</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <Divider label="During Test — Other Messages" />
+    <div className="overflow-x-auto pb-4">
+      <div className="flex items-start gap-3">
+        <ScreenCard label="User Sends Message During Test" sublabel="Any text while in_progress" note="Main menu buttons ignored too" width={210}>
+          <PhoneFrame width={210} height={280}>
+            <UserBubble>Salom</UserBubble>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              ⏳ Test davom etmoqda. Avval testni yakunlang.
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Tab 4: Lock System ─────────────────────────────────────────────────────
+
+const LockSystemTab = () => (
+  <div>
+    <SectionTitle icon="🔒" title="Lock System" subtitle="Progressive unlock — sections and topics open when prerequisites reach 90%+" />
+    <Legend />
+
+    <div className="flex flex-wrap gap-6 items-start mb-8">
+
+      {/* Diagram */}
+      <div className="rounded-xl p-4" style={{background:'#13161f', border:'1px solid #1e2130', minWidth:500}}>
+        <div className="text-white font-semibold mb-4" style={{fontSize:12}}>Content Tree — Lock Conditions</div>
+        <svg width="480" height="320" viewBox="0 0 480 320">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#4f6ef7"/>
+            </marker>
+            <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#d63031"/>
+            </marker>
+          </defs>
+
+          {/* Section A - Unlocked */}
+          <rect x="20" y="20" width="130" height="44" rx="8" fill="#1c2d4a" stroke="#4f6ef7" strokeWidth="2"/>
+          <text x="85" y="37" textAnchor="middle" fill="#7cb9e8" fontSize="11" fontWeight="bold">🔓 Bo'lim A</text>
+          <text x="85" y="54" textAnchor="middle" fill="#6b7280" fontSize="9">Harflar</text>
+
+          {/* Topic 1 */}
+          <rect x="20" y="100" width="110" height="40" rx="8" fill="#1e3a2e" stroke="#00b894" strokeWidth="2"/>
+          <text x="75" y="116" textAnchor="middle" fill="#55efc4" fontSize="10" fontWeight="bold">🔓 Mavzu 1</text>
+          <text x="75" y="130" textAnchor="middle" fill="#6b7280" fontSize="9">Alifbo</text>
+
+          {/* Topic 2 */}
+          <rect x="20" y="165" width="110" height="40" rx="8" fill="#1e3a2e" stroke="#00b894" strokeWidth="2"/>
+          <text x="75" y="181" textAnchor="middle" fill="#55efc4" fontSize="10" fontWeight="bold">🔓 Mavzu 2</text>
+          <text x="75" y="195" textAnchor="middle" fill="#6b7280" fontSize="9">Unlilar</text>
+
+          {/* Topic 3 - Locked */}
+          <rect x="20" y="230" width="110" height="40" rx="8" fill="#2a1e1e" stroke="#d63031" strokeWidth="2"/>
+          <text x="75" y="246" textAnchor="middle" fill="#ff7675" fontSize="10" fontWeight="bold">🔒 Mavzu 3</text>
+          <text x="75" y="260" textAnchor="middle" fill="#6b7280" fontSize="9">Undoshlar</text>
+
+          {/* Section B - Locked */}
+          <rect x="320" y="20" width="140" height="44" rx="8" fill="#2a1e1e" stroke="#d63031" strokeWidth="2"/>
+          <text x="390" y="37" textAnchor="middle" fill="#ff7675" fontSize="11" fontWeight="bold">🔒 Bo'lim B</text>
+          <text x="390" y="54" textAnchor="middle" fill="#6b7280" fontSize="9">Jumlalar</text>
+
+          {/* Topic 4 inside B */}
+          <rect x="330" y="100" width="110" height="40" rx="8" fill="#2a1e1e" stroke="#d63031" strokeWidth="2"/>
+          <text x="385" y="116" textAnchor="middle" fill="#ff7675" fontSize="10" fontWeight="bold">🔒 Mavzu 4</text>
+          <text x="385" y="130" textAnchor="middle" fill="#6b7280" fontSize="9">Sodda jumlalar</text>
+
+          {/* Connectors A → topics */}
+          <line x1="75" y1="64" x2="75" y2="100" className="connector"/>
+          <line x1="75" y1="64" x2="75" y2="165" className="connector"/>
+          <line x1="75" y1="64" x2="75" y2="230" className="connector"/>
+
+          {/* Unlock condition: Topic3 unlocks when Topic2 >= 90% */}
+          <path d="M 130 250 C 200 250 200 185 130 185" className="connector-red"/>
+          <text x="180" y="225" fill="#d63031" fontSize="9" textAnchor="middle">Mavzu 2 ≥ 90%</text>
+
+          {/* Unlock condition: Section B unlocks when Section A avg >= 90% */}
+          <path d="M 150 42 C 240 42 240 42 320 42" className="connector-red"/>
+          <text x="235" y="35" fill="#d63031" fontSize="9" textAnchor="middle">Bo'lim A avg ≥ 90%</text>
+
+          {/* B → Topic4 */}
+          <line x1="385" y1="64" x2="385" y2="100" className="connector"/>
+
+          {/* Labels */}
+          <text x="390" y="185" fill="#4f6ef7" fontSize="9" textAnchor="middle">--- unlock condition</text>
+          <rect x="310" y="175" width="160" height="14" rx="4" fill="#1a1d2e"/>
+          <text x="390" y="186" fill="#6b7280" fontSize="8" textAnchor="middle">(dashed = lock condition)</text>
+
+          {/* Legend boxes */}
+          <rect x="20" y="290" width="12" height="12" rx="2" fill="#1c2d4a" stroke="#4f6ef7" strokeWidth="1.5"/>
+          <text x="37" y="300" fill="#7cb9e8" fontSize="9">🔓 Open</text>
+          <rect x="100" y="290" width="12" height="12" rx="2" fill="#2a1e1e" stroke="#d63031" strokeWidth="1.5"/>
+          <text x="117" y="300" fill="#ff7675" fontSize="9">🔒 Locked</text>
+        </svg>
+      </div>
+
+      {/* Rules */}
+      <div className="flex flex-col gap-3">
+        <div className="p-4 rounded-xl" style={{background:'#13161f', border:'1px solid #1e2130', maxWidth:300}}>
+          <div className="text-white font-semibold mb-3" style={{fontSize:12}}>Lock Rules</div>
+          <ul className="space-y-2" style={{fontSize:10, color:'#9ca3af'}}>
+            <li className="flex gap-2"><span>🔓</span><span><strong style={{color:'white'}}>Topic unlock:</strong> prerequisite topic's best score ≥ 90%</span></li>
+            <li className="flex gap-2"><span>🔓</span><span><strong style={{color:'white'}}>Section unlock:</strong> prerequisite section's avg best-score ≥ 90%</span></li>
+            <li className="flex gap-2"><span>♾️</span><span><strong style={{color:'white'}}>Permanent:</strong> once unlocked, never re-locks (even if score drops)</span></li>
+            <li className="flex gap-2"><span>📊</span><span><strong style={{color:'white'}}>Best score:</strong> MAX(score_percent) per (user, topic)</span></li>
+            <li className="flex gap-2"><span>⚙️</span><span><strong style={{color:'white'}}>Admin sets:</strong> Open/Locked + which prerequisite + 90% threshold</span></li>
+          </ul>
+        </div>
+        <div className="p-4 rounded-xl" style={{background:'#13161f', border:'1px solid #1e2130', maxWidth:300}}>
+          <div className="text-blue-400 font-semibold mb-2" style={{fontSize:12}}>DB Storage</div>
+          <ul className="space-y-1" style={{fontSize:10, color:'#9ca3af'}}>
+            <li><code style={{color:'#74b9ff'}}>topics.unlock_required_topic</code> → FK to prerequisite topic</li>
+            <li><code style={{color:'#74b9ff'}}>sections.unlock_required_section</code> → FK to prerequisite section</li>
+            <li><code style={{color:'#74b9ff'}}>topic_unlocks(user_id, topic_id)</code> → permanent unlock record</li>
+            <li><code style={{color:'#74b9ff'}}>section_unlocks(user_id, section_id)</code> → permanent unlock record</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Chat when tapping locked */}
+      <ScreenCard label="Locked Item Tapped" sublabel="User taps 🔒 button" note="Bot explains unlock condition" width={220}>
+        <PhoneFrame width={220} height={280}>
+          <BotBubble tags={[{type:'text',label:'Text'}]}>
+            🔒 Hozircha yopiq.{"\n\n"}
+            Ochish uchun avval{"\n"}
+            <strong>Unlilar mavzusidan</strong>{"\n"}
+            kamida <strong>90%</strong> oling.
+            <InlineKeyboard rows={[['⬅️ Orqaga']]} />
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+
+      {/* Unlock event */}
+      <ScreenCard label="Just Unlocked!" sublabel="Score ≥ 90% achieved" note="New topic now shows 🔓" width={220}>
+        <PhoneFrame width={220} height={280}>
+          <BotBubble tags={[{type:'text',label:'Text'}]}>
+            🎉 <strong>Tabrik!</strong> Unlilar mavzusini{"\n"}
+            <strong>95%</strong> bilan tugatdingiz!{"\n\n"}
+            🔓 <strong>Undoshlar</strong> mavzusi ochildi!
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+    </div>
+  </div>
+);
+
+// ─── Tab 5: My Results ──────────────────────────────────────────────────────
+
+const MyResultsTab = () => (
+  <div>
+    <SectionTitle icon="📊" title="My Results (Natijalarim)" subtitle="Last 20 test results displayed in chat — no Web App, pure messages" />
+    <Legend />
+
+    <div className="flex flex-wrap gap-6 items-start">
+      <ScreenCard label="Natijalarim" sublabel="Text messages, no buttons" note="Most recent result first" width={250} height={500}>
+        <PhoneFrame width={250} height={470}>
+          <BotBubble tags={[{type:'text',label:'Text'}]}>
+            📊 <strong>Sizning natijalaringiz</strong>{"\n"}(oxirgi 20 ta):{"\n\n"}
+            <strong>1.</strong> Abdulloh Karimov{"\n"}
+            📅 22.02.2026 14:30{"\n"}
+            📚 Alifbo{"\n"}
+            ✅ 9 | ❌ 1 | 📈 <strong>90%</strong>{"\n"}
+            ────────────────{"\n"}
+            <strong>2.</strong> Abdulloh Karimov{"\n"}
+            📅 21.02.2026 10:15{"\n"}
+            📚 Unlilar{"\n"}
+            ✅ 12 | ❌ 3 | 📈 <strong>80%</strong>{"\n"}
+            ────────────────{"\n"}
+            <strong>3.</strong> Abdulloh Karimov{"\n"}
+            📅 20.02.2026 18:00{"\n"}
+            📚 Alifbo{"\n"}
+            ✅ 7 | ❌ 3 | 📈 <strong>70%</strong>
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+
+      <div className="flex flex-col gap-3" style={{maxWidth:300}}>
+        <div className="p-4 rounded-xl" style={{background:'#13161f', border:'1px solid #1e2130'}}>
+          <div className="text-white font-semibold mb-3" style={{fontSize:12}}>Per Result Fields</div>
+          <div className="space-y-2">
+            {[
+              {field:'Full Name', val:'From users table'},
+              {field:'Date & Time', val:'Asia/Tashkent timezone'},
+              {field:'Topic Name', val:'From topics.title (snapshot)'},
+              {field:'Correct Count', val:'test_sessions.correct_count'},
+              {field:'Wrong Count', val:'test_sessions.wrong_count'},
+              {field:'Percentage', val:'test_sessions.score_percent'},
+            ].map((r,i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span style={{fontSize:9, color:'#74b9ff', minWidth:80}}>{r.field}</span>
+                <span style={{fontSize:9, color:'#6b7280'}}>{r.val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="p-4 rounded-xl" style={{background:'#13161f', border:'1px solid #1e2130'}}>
+          <div className="text-yellow-400 font-semibold mb-2" style={{fontSize:12}}>Notes</div>
+          <ul className="space-y-1" style={{fontSize:10, color:'#9ca3af'}}>
+            <li>• User sees only their own results</li>
+            <li>• Results stored permanently (never deleted)</li>
+            <li>• Abandoned tests also shown</li>
+            <li>• No per-question breakdown (aggregate only)</li>
+            <li>• Sorted newest first</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Tab 6: Leaderboard ─────────────────────────────────────────────────────
+
+const LeaderboardTab = () => (
+  <div>
+    <SectionTitle icon="🏆" title="Top O'quvchilar (Leaderboard)" subtitle="Top 40 users with 10+ solved topics, ranked by average best-score. Sent as 4 messages (10 each)." />
+    <Legend />
+
+    <div className="flex flex-wrap gap-6 items-start">
+
+      <ScreenCard label="Top 1–10 (Message 1)" sublabel="Sent as separate messages" note="Old messages deleted on each press" width={250} height={520}>
+        <PhoneFrame width={250} height={490}>
+          <BotBubble tags={[{type:'text',label:'Text'}]}>
+            🏆 <strong>TOP O'QUVCHILAR</strong>{"\n"}
+            ━━━━━━━━━━━━━━━{"\n"}
+            🥇 <strong>1.</strong> Kamol Toshmatov — <strong>96.5%</strong>{"\n"}
+            🥈 <strong>2.</strong> Sarvar Yusupov — <strong>94.2%</strong>{"\n"}
+            🥉 <strong>3.</strong> Nodira Hasanova — <strong>92.8%</strong>{"\n"}
+            &nbsp;&nbsp;&nbsp;&nbsp;<strong>4.</strong> Abdulloh Karimov — <strong>91.0%</strong>{"\n"}
+            &nbsp;&nbsp;&nbsp;&nbsp;<strong>5.</strong> Malika Rahimova — <strong>89.5%</strong>{"\n"}
+            &nbsp;&nbsp;&nbsp;&nbsp;<strong>6.</strong> Jasur Mirzayev — <strong>88.0%</strong>{"\n"}
+            &nbsp;&nbsp;&nbsp;&nbsp;<strong>7.</strong> Zulfiya Omonova — <strong>86.5%</strong>{"\n"}
+            &nbsp;&nbsp;&nbsp;&nbsp;<strong>8.</strong> Bekzod Aliyev — <strong>85.0%</strong>{"\n"}
+            &nbsp;&nbsp;&nbsp;&nbsp;<strong>9.</strong> Shirin Nazarova — <strong>84.0%</strong>{"\n"}
+            <strong>10.</strong> Timur Xoliqov — <strong>83.5%</strong>
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+
+      <div className="flex flex-col gap-3">
+        <ScreenCard label="User's Position (in top)" sublabel="Shown after leaderboard messages" width={220} height={200}>
+          <PhoneFrame width={220} height={170}>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              🎉 <strong>Tabriklaymiz!</strong>{"\n"}
+              Siz top 40 talikda{"\n"}
+              <strong>4-o'rindasiz.</strong>
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+        <ScreenCard label="User Outside Top 40" sublabel="Shows overall rank" width={220} height={200}>
+          <PhoneFrame width={220} height={170}>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              Siz top ichiga{"\n"}
+              kirolmadingiz.{"\n"}
+              Siz <strong>52-o'rindasiz.</strong>
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+      </div>
+
+      <div className="flex flex-col gap-3" style={{maxWidth:280}}>
+        <div className="p-4 rounded-xl" style={{background:'#13161f', border:'1px solid #1e2130'}}>
+          <div className="text-white font-semibold mb-3" style={{fontSize:12}}>Ranking Algorithm</div>
+          <div className="rounded-lg p-2 mb-2" style={{background:'#0e1621', fontFamily:'monospace', fontSize:9, color:'#55efc4', lineHeight:1.6}}>
+{`SELECT user_id,
+  AVG(best_score) avg,
+  COUNT(*) topics
+FROM (
+  SELECT user_id, topic_id,
+    MAX(score_percent) best_score
+  FROM test_sessions
+  WHERE status='completed'
+  GROUP BY user_id, topic_id
+) t
+GROUP BY user_id
+HAVING COUNT(*) >= 10
+ORDER BY avg DESC
+LIMIT 40;`}
+          </div>
+          <ul className="space-y-1" style={{fontSize:10, color:'#9ca3af'}}>
+            <li>• Must solve ≥ 10 topics to appear</li>
+            <li>• Best attempt per topic used</li>
+            <li>• Average of all best scores = rank score</li>
+            <li>• Up to 40 users shown (4 messages × 10)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Tab 7: Guide & Support ─────────────────────────────────────────────────
+
+const GuideSupportTab = () => (
+  <div>
+    <SectionTitle icon="📖" title="Guide & Support" subtitle="Qo'llanma (guide materials) and Yordam (user ↔ admin support chat)" />
+    <Legend />
+
+    <div className="flex flex-wrap gap-6 items-start">
+
+      {/* Guide */}
+      <div>
+        <div className="text-white font-semibold mb-3" style={{fontSize:13}}>📖 Qo'llanma Flow</div>
+        <div className="flex items-start gap-3 flex-wrap">
+          <ScreenCard label="Guide Triggered" sublabel="Old messages deleted first" note="Up to 20 items sent in order" width={220} height={440}>
+            <PhoneFrame width={220} height={410}>
+              <BotBubble tags={[{type:'media',label:'Video'}]}>
+                <div className="rounded-lg p-3 flex items-center gap-2" style={{background:'#1a2332'}}>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:'#2b5278'}}>▶️</div>
+                  <div>
+                    <div style={{fontSize:10, color:'white', fontWeight:600}}>Dars 1: Kirish</div>
+                    <div style={{fontSize:9, color:'#9ca3af'}}>5:32 · 24.5 MB</div>
+                  </div>
+                </div>
+              </BotBubble>
+              <BotBubble tags={[{type:'text',label:'Text'}]}>
+                📖 <strong>Arab alifbosi</strong>{"\n\n"}
+                Arab tili 28 harfdan iborat. Harflar o'ngdan chapga yoziladi...
+              </BotBubble>
+              <BotBubble tags={[{type:'media',label:'Video'}]}>
+                <div className="rounded-lg p-3 flex items-center gap-2" style={{background:'#1a2332'}}>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:'#2b5278'}}>▶️</div>
+                  <div>
+                    <div style={{fontSize:10, color:'white', fontWeight:600}}>Dars 2: Harflar</div>
+                    <div style={{fontSize:9, color:'#9ca3af'}}>8:15 · 36.1 MB</div>
+                  </div>
+                </div>
+              </BotBubble>
+            </PhoneFrame>
+          </ScreenCard>
+        </div>
+      </div>
+
+      {/* Support */}
+      <div>
+        <div className="text-white font-semibold mb-3" style={{fontSize:13}}>❓ Yordam (Support Chat)</div>
+        <div className="flex items-start gap-3 flex-wrap">
+
+          <ScreenCard label="User Enters Yordam" sublabel="Last 10 messages shown" note="User sends text-only" width={230} height={460}>
+            <PhoneFrame width={230} height={430}>
+              <BotBubble tags={[{type:'text',label:'Text'}]}>
+                💬 <strong>Yordam</strong>{"\n"}
+                Savollaringizni adminga yo'llashingiz mumkin.{"\n\n"}
+                ─── Oxirgi xabarlar ───{"\n"}
+                <span style={{color:'#55efc4'}}>Siz:</span> Salom, savol bor edi{"\n"}
+                <span style={{color:'#74b9ff'}}>Admin:</span> Xush kelibsiz! Qanday yordam?{"\n"}
+                <span style={{color:'#55efc4'}}>Siz:</span> Harflarni yodlash haqida{"\n"}
+                <span style={{color:'#74b9ff'}}>Admin:</span> [🖼 Rasm yuborildi]{"\n"}
+                ──────────────────────{"\n\n"}
+                Xabar yozing 👇
+              </BotBubble>
+            </PhoneFrame>
+          </ScreenCard>
+
+          <ScreenCard label="Admin View (Bot)" sublabel="Admin panel — Xabarlar" note="First to reply claims thread" width={230} height={460}>
+            <PhoneFrame width={230} height={430} title="Admin Bot">
+              <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+                📩 <strong>Yangi xabar</strong>{"\n\n"}
+                👤 <strong>Abdulloh Karimov</strong>{"\n"}
+                ID: 123456789{"\n\n"}
+                <em>"Harflarni yodlash haqida savol bor edi..."</em>
+                <InlineKeyboard rows={[['💬 Javob berish']]} />
+              </BotBubble>
+              <BotBubble tags={[{type:'text',label:'Text'}]}>
+                Javobingizni yuboring:
+              </BotBubble>
+            </PhoneFrame>
+          </ScreenCard>
+
+          <div className="p-4 rounded-xl" style={{background:'#13161f', border:'1px solid #1e2130', maxWidth:260, alignSelf:'flex-start'}}>
+            <div className="text-white font-semibold mb-3" style={{fontSize:12}}>Support Rules</div>
+            <div className="space-y-2" style={{fontSize:10, color:'#9ca3af'}}>
+              <div><strong style={{color:'#55efc4'}}>User can send:</strong> Text only</div>
+              <div><strong style={{color:'#74b9ff'}}>Admin can send:</strong> Text, image, file, audio, voice message</div>
+              <div><strong style={{color:'#fdcb6e'}}>Thread claiming:</strong> First admin to reply "owns" the thread</div>
+              <div><strong style={{color:'#fd79a8'}}>Reassign:</strong> Super admin can reassign to another admin</div>
+              <div><strong style={{color:'#a29bfe'}}>User visibility:</strong> Last 10 messages shown when entering Yordam</div>
+              <div><strong style={{color:'#00cec9'}}>Admin reply delivery:</strong> Not a push notification — user sees it in Yordam section</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Tab 8: Admin Panel ─────────────────────────────────────────────────────
+
+const AdminPanelTab = () => (
+  <div>
+    <SectionTitle icon="⚙️" title="Admin Panel" subtitle="Super admin + regular admin flows — login, test management, statistics, announcements" />
+    <Legend />
+
+    {/* Login Flow */}
+    <div className="mb-8">
+      <div className="text-white font-semibold mb-4" style={{fontSize:13}}>🔐 Admin Login Flow</div>
+      <div className="overflow-x-auto pb-4">
+        <div className="flex items-start gap-3" style={{minWidth:1000}}>
+
+          <ScreenCard label="1. /admin command" sublabel="Hidden from regular users" note="No button — text input expected">
+            <PhoneFrame>
+              <UserBubble>/admin</UserBubble>
+              <BotBubble tags={[{type:'text',label:'Text'}]}>
+                🔐 Admin paroli:
+              </BotBubble>
+            </PhoneFrame>
+          </ScreenCard>
+
+          <Arrow label="password entered" />
+
+          <ScreenCard label="2a. Correct Password" sublabel="Admin panel opens" note="Reply keyboard changes">
+            <PhoneFrame>
+              <BotBubble tags={[{type:'reply',label:'Reply'}]}>
+                ✅ Admin panelga xush kelibsiz!
+              </BotBubble>
+              <ReplyKeyboard rows={[
+                ['📝 Test qo\'shish','✏️ Tahrirlash'],
+                ['📊 Statistika','💬 Xabarlar'],
+                ['📖 Qo\'llanma','📢 E\'lon'],
+              ]}/>
+            </PhoneFrame>
+          </ScreenCard>
+
+          <div className="flex flex-col gap-2 self-center">
+            <Arrow label="wrong (attempt 1-2)" />
+            <Arrow label="wrong (attempt 3)" />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <ScreenCard label="2b. Wrong Password" sublabel="1–2 attempts remaining" width={200} height={200}>
+              <PhoneFrame width={200} height={170}>
+                <BotBubble tags={[{type:'text',label:'Text'}]}>
+                  ❌ Noto'g'ri parol.{"\n"}
+                  <strong>2 ta</strong> urinish qoldi.
+                </BotBubble>
+              </PhoneFrame>
+            </ScreenCard>
+            <ScreenCard label="2c. Blocked" sublabel="3rd wrong attempt" width={200} height={200} note="Super admin unblocks in Sozlamalar">
+              <PhoneFrame width={200} height={170}>
+                <BotBubble tags={[{type:'text',label:'Text'}]}>
+                  🚫 Siz bloklandingiz.{"\n"}
+                  Bosh admin bilan bog'laning.
+                </BotBubble>
+              </PhoneFrame>
+            </ScreenCard>
+          </div>
+
+          <ScreenCard label="Super Admin Panel" sublabel="Extra Sozlamalar button" note="Super admin = hardcoded Telegram ID in .env">
+            <PhoneFrame>
+              <BotBubble tags={[{type:'reply',label:'Reply'}]}>
+                ✅ Bosh admin paneli
+              </BotBubble>
+              <ReplyKeyboard rows={[
+                ['📝 Test qo\'shish','✏️ Tahrirlash'],
+                ['📊 Statistika','💬 Xabarlar'],
+                ['📖 Qo\'llanma','📢 E\'lon'],
+                ['⚙️ Sozlamalar'],
+              ]}/>
+            </PhoneFrame>
+          </ScreenCard>
+
+        </div>
+      </div>
+    </div>
+
+    {/* Regular Admin Approval Flow */}
+    <Divider label="New Regular Admin Approval Flow" />
+    <div className="overflow-x-auto pb-4 mb-8">
+      <div className="flex items-start gap-3" style={{minWidth:900}}>
+        <ScreenCard label="1. /admin + Shared Password" sublabel="Any new user" width={210}>
+          <PhoneFrame width={210} height={300}>
+            <UserBubble>/admin</UserBubble>
+            <BotBubble>🔐 Admin paroli:</BotBubble>
+            <UserBubble>admin123</UserBubble>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              ⏳ Parol to'g'ri. Bosh admin tasdiqlashini kuting...
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+        <Arrow label="super admin notified" />
+        <ScreenCard label="2. Super Admin Sees Request" sublabel="Super admin's bot" width={210}>
+          <PhoneFrame width={210} height={300} title="Admin Bot (Super)">
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              👤 <strong>Yangi admin so'rovi</strong>{"\n\n"}
+              Ism: Bekzod Aliyev{"\n"}
+              ID: 987654321
+              <InlineKeyboard rows={[['✅ Tasdiqlash','❌ Rad etish']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+        <Arrow label="approved" />
+        <ScreenCard label="3. Approved" sublabel="Admin access granted" width={210}>
+          <PhoneFrame width={210} height={300}>
+            <BotBubble tags={[{type:'reply',label:'Reply'}]}>
+              ✅ Siz admin sifatida tasdiqlandi!
+            </BotBubble>
+            <ReplyKeyboard rows={[
+              ['📝 Test qo\'shish','✏️ Tahrirlash'],
+              ['📊 Statistika','💬 Xabarlar'],
+              ['📖 Qo\'llanma','📢 E\'lon'],
+            ]}/>
+          </PhoneFrame>
+        </ScreenCard>
+      </div>
+    </div>
+
+    {/* Test Management */}
+    <Divider label="Test Management Flows" />
+    <div className="flex flex-wrap gap-6 mb-8">
+
+      <ScreenCard label="Add Question — Step 1" sublabel="Select section/topic" width={210}>
+        <PhoneFrame width={210} height={330}>
+          <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+            📂 Bo'limni tanlang:
+            <InlineKeyboard rows={[['📁 Harflar'],['📁 So\'zlar'],['➕ Yangi bo\'lim'],['❌ Bekor']]} />
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+
+      <ScreenCard label="Add Question — Step 2" sublabel="Set topic params" width={210}>
+        <PhoneFrame width={210} height={330}>
+          <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+            ⚙️ Mavzu sozlamalari:{"\n\n"}
+            ⏱ Vaqt:
+            <InlineKeyboard rows={[['5s','10s','15s','20s'],['25s','30s','45s','60s']]} />
+          </BotBubble>
+          <BotBubble>
+            Variantlar soni:
+            <InlineKeyboard rows={[['3 ta','4 ta']]} />
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+
+      <ScreenCard label="Add Question — Step 3" sublabel="Enter question content" width={210}>
+        <PhoneFrame width={210} height={330}>
+          <BotBubble tags={[{type:'text',label:'Text'}]}>
+            Savolni yuboring:{"\n"}
+            (matn, rasm, audio, video)
+          </BotBubble>
+          <BotBubble>
+            Javob variantlarini yuboring:{"\n"}
+            (1-chi javob = <strong>to'g'ri</strong>)
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+
+      <ScreenCard label="Excel/CSV Upload" sublabel="Bulk import" note="Format: Question | A(correct) | B | C | D" width={210}>
+        <PhoneFrame width={210} height={330}>
+          <BotBubble tags={[{type:'text',label:'Text'}]}>
+            📎 Excel yoki CSV faylini yuboring:{"\n\n"}
+            Format (4 variantli):{"\n"}
+            <code style={{fontSize:8}}>Savol | A | B | C | D</code>{"\n\n"}
+            A har doim to'g'ri deb yuklanadi.
+          </BotBubble>
+          <BotBubble tags={[{type:'media',label:'File accepted'}]}>
+            ✅ 45 ta savol muvaffaqiyatli yuklandi!
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+
+    </div>
+
+    {/* Announcement */}
+    <Divider label="Announcement (E'lon) Flow" />
+    <div className="overflow-x-auto pb-4 mb-8">
+      <div className="flex items-start gap-3" style={{minWidth:700}}>
+        <ScreenCard label="1. Create Announcement" sublabel="Admin sends content" width={210}>
+          <PhoneFrame width={210} height={300}>
+            <BotBubble>📢 E'lon matnini yoki mediani yuboring:</BotBubble>
+            <UserBubble>Bugun yangi bo'lim ochildi! 🎉</UserBubble>
+            <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+              Barcha foydalanuvchilarga{"\n"}
+              yuborilsinmi?{"\n"}
+              (<strong>1,234 ta</strong> foydalanuvchi)
+              <InlineKeyboard rows={[['✅ Ha, yuborish','❌ Bekor']]} />
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+        <Arrow label="confirmed" />
+        <ScreenCard label="2. Broadcast in Progress" sublabel="Queue-based sending" width={210}>
+          <PhoneFrame width={210} height={300}>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              📤 Yuborilmoqda...{"\n\n"}
+              ✅ <strong>1,230</strong> ta yetkazildi{"\n"}
+              ⚠️ <strong>4</strong> ta blokda (o'tkazib yuborildi)
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+        <Arrow label="all users receive" />
+        <ScreenCard label="3. User Receives" sublabel="Auto-deletes after 24h" width={210}>
+          <PhoneFrame width={210} height={300}>
+            <BotBubble tags={[{type:'text',label:'Text'}]}>
+              📢 <strong>E'lon</strong>{"\n\n"}
+              Bugun yangi bo'lim ochildi! 🎉{"\n\n"}
+              <span style={{fontSize:8, color:'#6b7280'}}>⏰ 24 soatdan keyin o'chiriladi</span>
+            </BotBubble>
+          </PhoneFrame>
+        </ScreenCard>
+      </div>
+    </div>
+
+    {/* Statistics */}
+    <Divider label="Statistics Download" />
+    <div className="flex flex-wrap gap-6">
+      <ScreenCard label="Statistika" sublabel="3-sheet Excel download" width={220}>
+        <PhoneFrame width={220} height={320}>
+          <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+            📊 <strong>Statistika</strong>{"\n\n"}
+            Qaysi formatda yuklab olish?
+            <InlineKeyboard rows={[['📥 Excel (.xlsx)'],['⬅️ Orqaga']]} />
+          </BotBubble>
+          <BotBubble tags={[{type:'media',label:'File'}]}>
+            <div className="rounded-lg p-2 flex items-center gap-2" style={{background:'#1a2332'}}>
+              <span style={{fontSize:20}}>📊</span>
+              <div>
+                <div style={{fontSize:10, color:'white'}}>statistics_22-02-2026.xlsx</div>
+                <div style={{fontSize:9, color:'#9ca3af'}}>3 sheets · 48.2 KB</div>
+              </div>
+            </div>
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+
+      <div className="p-4 rounded-xl" style={{background:'#13161f', border:'1px solid #1e2130', maxWidth:300, alignSelf:'flex-start'}}>
+        <div className="text-white font-semibold mb-3" style={{fontSize:12}}>Excel Sheet Contents</div>
+        <div className="space-y-3">
+          {[
+            {sheet:'Sheet 1 — Umumiy', items:['Total users','Today\'s new registrations','Today\'s active users','Total tests','Today\'s tests']},
+            {sheet:'Sheet 2 — Mavzular', items:['Top 10 most attempted','Top 10 least attempted','Top 10 hardest (lowest avg)','Top 10 easiest (highest avg)']},
+            {sheet:'Sheet 3 — Foydalanuvchilar', items:['Full name','Average score','Total results']},
+          ].map((s,i)=>(
+            <div key={i}>
+              <div className="text-blue-400 font-semibold mb-1" style={{fontSize:10}}>{s.sheet}</div>
+              <ul className="space-y-0.5">{s.items.map((item,j)=><li key={j} style={{fontSize:9, color:'#9ca3af'}}>• {item}</li>)}</ul>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <ScreenCard label="Sozlamalar (Super Admin)" sublabel="Admin management" width={220}>
+        <PhoneFrame width={220} height={320}>
+          <BotBubble tags={[{type:'inline',label:'Inline'}]}>
+            ⚙️ <strong>Sozlamalar</strong>
+            <InlineKeyboard rows={[
+              ['👥 Adminlar ro\'yxati'],
+              ['➕ Admin qo\'shish'],
+              ['🔑 Parolni o\'zgartirish'],
+              ['🔓 Bloklangan adminlar'],
+              ['⬅️ Orqaga'],
+            ]} />
+          </BotBubble>
+        </PhoneFrame>
+      </ScreenCard>
+    </div>
+  </div>
+);
+
+// ─── Main App ───────────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 'registration', label: '📋 Registration', component: RegistrationTab },
+  { id: 'menu', label: '🏠 Main Menu', component: MainMenuTab },
+  { id: 'test', label: '📝 Test Flow', component: TestFlowTab },
+  { id: 'lock', label: '🔒 Lock System', component: LockSystemTab },
+  { id: 'results', label: '📊 My Results', component: MyResultsTab },
+  { id: 'leaderboard', label: '🏆 Leaderboard', component: LeaderboardTab },
+  { id: 'guide', label: '📖 Guide & Support', component: GuideSupportTab },
+  { id: 'admin', label: '⚙️ Admin Panel', component: AdminPanelTab },
+];
+
+const App = () => {
+  const [activeTab, setActiveTab] = useState('registration');
+  const ActiveComponent = TABS.find(t => t.id === activeTab)?.component || RegistrationTab;
+
+  return (
+    <div className="min-h-screen flow-canvas text-white">
+      {/* Header */}
+      <div className="sticky top-0 z-50" style={{background:'rgba(15,17,23,0.95)', backdropFilter:'blur(12px)', borderBottom:'1px solid #1e2130'}}>
+        <div className="max-w-screen-2xl mx-auto px-4 py-3">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm">🤖</div>
+            <div>
+              <h1 className="text-white font-bold" style={{fontSize:15}}>Arab Tili Yordamchi Bot — Flow Canvas</h1>
+              <p className="text-gray-500" style={{fontSize:10}}>Zaman Akademiyasi · NestJS + grammY + PostgreSQL</p>
+            </div>
+          </div>
+          {/* Tabs */}
+          <div className="flex gap-1 overflow-x-auto pb-1" style={{scrollbarHeight:'none'}}>
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-white font-medium transition-all ${
+                  activeTab === tab.id ? 'tab-active' : 'hover:bg-gray-800'
+                }`}
+                style={{fontSize:11, background: activeTab === tab.id ? undefined : '#13161f', border:'1px solid #1e2130'}}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-screen-2xl mx-auto px-4 py-6">
+        <ActiveComponent />
+      </div>
+
+      {/* Footer */}
+      <div className="border-t py-4 px-4 text-center" style={{borderColor:'#1e2130'}}>
+        <p className="text-gray-600" style={{fontSize:10}}>
+          Arab Tili Yordamchi Bot · Bot Flow Canvas · Generated 2026-02-22
+        </p>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<div id="root"></div>
+</body>
+</html>
