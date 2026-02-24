@@ -23,8 +23,8 @@ module.exports = {
     {
       name: 'arab-tili-bot',
 
-      // Entry point — NestJS compiles to apps/bot/dist/src/main.js
-      script: 'dist/src/main.js',
+      // Entry point — NestJS compiles to apps/bot/dist/apps/bot/src/main.js
+      script: 'dist/apps/bot/src/main.js',
       cwd: './apps/bot',
 
       // Telegram long-polling must run on exactly ONE process
