@@ -7,8 +7,6 @@ import {
   ParseIntPipe,
   UseGuards,
   Body,
-  Inject,
-  Optional,
   Req,
   ForbiddenException,
   NotFoundException,
@@ -21,13 +19,18 @@ import { SuperAdminGuard } from '@/api/auth/super-admin.guard';
 import { AdminRepository } from '@/repositories/admin.repository';
 import type { AdminRow } from '@/repositories/admin.repository';
 import type { AdminDto } from '@arab-tili/shared-types';
+import { BotService } from '@/bot/bot.service';
+import { adminMenuKeyboard } from '@/common/utils/keyboard';
 
 @ApiTags('admins')
 @ApiBearerAuth()
 @UseGuards(AdminJwtGuard, SuperAdminGuard)
 @Controller('admins')
 export class AdminsController {
-  constructor(private readonly adminRepo: AdminRepository) {}
+  constructor(
+    private readonly adminRepo: AdminRepository,
+    private readonly botService: BotService,
+  ) {}
 
   @Get()
   async findAll(): Promise<AdminDto[]> {
@@ -37,7 +40,17 @@ export class AdminsController {
 
   @Patch(':id/approve')
   async approve(@Param('id', ParseIntPipe) id: number): Promise<{ success: boolean }> {
+    const admin = await this.adminRepo.findById(id);
+    if (!admin) throw new NotFoundException('Admin topilmadi');
     await this.adminRepo.update(id, { is_approved: true });
+    // Notify the newly approved admin in Telegram
+    await this.botService.bot.api
+      .sendMessage(
+        admin.telegram_id,
+        '✅ Sizning admin so\'rovingiz tasdiqlandi!\n\nEndi admin paneliga kirishingiz mumkin.',
+        { reply_markup: adminMenuKeyboard() },
+      )
+      .catch(() => undefined); // ignore if user has blocked the bot
     return { success: true };
   }
 
