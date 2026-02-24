@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { BotService } from '@/bot/bot.service';
 import { UserRepository } from '@/repositories/user.repository';
 import { RegistrationState } from '@/common/constants/registration-states';
-import { mainMenuKeyboard } from '@/common/utils/keyboard';
+import { adminMenuKeyboard, mainMenuKeyboard } from '@/common/utils/keyboard';
 
 /** Detect which script the name is written in */
 function detectScript(name: string): 'latin' | 'cyrillic' | 'arabic' {
@@ -58,6 +58,12 @@ export class RegistrationHandler implements OnModuleInit {
 
     // /start command
     bot.command('start', async (ctx) => {
+      // Approved admins always see the admin menu, regardless of user state
+      if (ctx.dbAdmin) {
+        await ctx.reply('Admin menyu:', { reply_markup: adminMenuKeyboard() });
+        return;
+      }
+
       const user = ctx.dbUser;
       if (!user) return;
 
