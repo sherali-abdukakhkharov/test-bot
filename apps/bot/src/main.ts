@@ -3,8 +3,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
-import { type Request, type Response } from 'express';
 import { AppModule } from './app.module';
+import { SpaExceptionFilter } from './spa-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -30,6 +30,17 @@ async function bootstrap() {
     }),
   );
 
+  // Serve built React web panel static assets (JS/CSS/images).
+  // __dirname resolves to .../apps/bot/dist/apps/bot/src/ at runtime (due to
+  // TypeScript rootDir expansion from the @arab-tili/shared-types alias).
+  // Four levels up reaches apps/bot/ where public/ lives.
+  const publicDir = join(__dirname, '..', '..', '..', '..', 'public');
+  app.useStaticAssets(publicDir);
+
+  // SPA exception filter: serves index.html for any NotFoundException that
+  // isn't under /api/, enabling React Router client-side navigation.
+  app.useGlobalFilters(new SpaExceptionFilter());
+
   // Swagger (dev only)
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
@@ -41,30 +52,6 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
   }
-
-  // Initialise NestJS (registers all controller routes into Express) before we
-  // add the raw Express catch-all. listen() calls init() internally, but only
-  // AFTER we've already attached our catch-all — so we call init() explicitly
-  // here first to guarantee NestJS routes are in the stack first.
-  await app.init();
-
-  // Serve built React web panel static assets (JS/CSS/images) from apps/bot/public/
-  const publicDir = join(__dirname, '..', 'public');
-  app.useStaticAssets(publicDir);
-
-  // SPA catch-all: serve index.html for any route that isn't /api/** or a static file.
-  // Registered directly on the Express instance AFTER app.init() so NestJS routes
-  // take priority and this handler is only reached for unknown paths.
-  const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.get(/.*/, (req: Request, res: Response) => {
-    if (req.path.startsWith('/api/')) {
-      res.status(404).json({ message: 'Not found' });
-      return;
-    }
-    res.sendFile(join(publicDir, 'index.html'), (err) => {
-      if (err) res.status(500).json({ message: 'Internal error' });
-    });
-  });
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
