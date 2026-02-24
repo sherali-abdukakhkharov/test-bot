@@ -11,6 +11,9 @@ export class MainMenuHandler implements OnModuleInit {
     const bot = this.botService.bot;
 
     bot.on('message:text', async (ctx, next) => {
+      // Pass through if there is an active session flow (e.g. admin password prompt)
+      if (ctx.session.adminStep) return next();
+
       const text = ctx.message.text;
 
       // Admin flow: approved admins get their own minimal menu
