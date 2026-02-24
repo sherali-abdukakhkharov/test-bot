@@ -4,6 +4,7 @@ import { AdminRepository } from '@/repositories/admin.repository';
 import { SettingsRepository } from '@/repositories/settings.repository';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { adminMenuKeyboard } from '@/common/utils/keyboard';
 
 const MAX_FAILED_ATTEMPTS = 5;
 
@@ -43,6 +44,7 @@ export class AdminAuthHandler implements OnModuleInit {
           `✅ Xush kelibsiz, Admin!\n\n` +
             `👤 Ism: ${from.first_name ?? ''}\n` +
             `🔑 Rol: ${existing.role === 'super' ? 'Super Admin' : 'Admin'}`,
+          { reply_markup: adminMenuKeyboard() },
         );
         return;
       }
@@ -58,7 +60,7 @@ export class AdminAuthHandler implements OnModuleInit {
           role: 'super',
           is_approved: true,
         });
-        await ctx.reply('👑 Siz Super Admin sifatida ro\'yxatdan o\'tdingiz va tasdiqlandi!');
+        await ctx.reply('👑 Siz Super Admin sifatida ro\'yxatdan o\'tdingiz va tasdiqlandi!', { reply_markup: adminMenuKeyboard() });
         return;
       }
 
@@ -108,7 +110,7 @@ export class AdminAuthHandler implements OnModuleInit {
 
       if (existing) {
         await this.adminRepo.resetFailedAttempts(existing.id);
-        await ctx.reply('✅ Xush kelibsiz, Admin!');
+        await ctx.reply('✅ Xush kelibsiz, Admin!', { reply_markup: adminMenuKeyboard() });
         return;
       }
 
@@ -130,24 +132,22 @@ export class AdminAuthHandler implements OnModuleInit {
           '✅ So\'rovingiz qabul qilindi!\n\n' +
             'Super admin tasdiqlagunga qadar kuting. Siz haqingizda xabar beriladi.',
         );
-        // Notify super admins
-        const superAdminIdEnv = this.config.get<string>('SUPER_ADMIN_TG_ID');
-        if (superAdminIdEnv) {
-          try {
-            await bot.api.sendMessage(
-              superAdminIdEnv,
-              `🆕 Yangi admin so\'rovi:\n\n` +
-                `👤 ${from.first_name ?? ''} ${from.last_name ?? ''}\n` +
-                `🔗 @${from.username ?? 'yo\'q'}\n` +
-                `🆔 ${telegramId}\n\n` +
-                'Tasdiqlash uchun /admins buyrug\'ini yuboring.',
-            );
-          } catch {
-            // super admin may not have started bot
-          }
-        }
+        // Notify all approved super admins; fall back to env var during bootstrap
+        const superAdmins = await this.adminRepo.findAllApprovedSuperAdmins();
+        const notifyIds =
+          superAdmins.length > 0
+            ? superAdmins.map((a) => a.telegram_id)
+            : [this.config.get<string>('SUPER_ADMIN_TG_ID')].filter((id): id is string => Boolean(id));
+
+        const message =
+          `🆕 Yangi admin so\'rovi:\n\n` +
+          `👤 ${from.first_name ?? ''} ${from.last_name ?? ''}\n` +
+          `🔗 @${from.username ?? 'yo\'q'}\n` +
+          `🆔 ${telegramId}`;
+
+        await Promise.allSettled(notifyIds.map((id) => bot.api.sendMessage(id, message)));
       } else {
-        await ctx.reply('👑 Siz Super Admin sifatida tasdiqlandi!');
+        await ctx.reply('👑 Siz Super Admin sifatida tasdiqlandi!', { reply_markup: adminMenuKeyboard() });
       }
     });
   }

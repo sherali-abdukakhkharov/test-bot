@@ -17,6 +17,10 @@ export interface UserRow {
 
 @Injectable()
 export class UserRepository extends BaseRepository {
+  async findById(id: bigint | number | string): Promise<UserRow | null> {
+    return this.db('users').where({ id: String(id) }).first() ?? null;
+  }
+
   async findByTelegramId(telegramId: string | number): Promise<UserRow | null> {
     return this.db('users').where({ telegram_id: String(telegramId) }).first() ?? null;
   }
@@ -30,9 +34,11 @@ export class UserRepository extends BaseRepository {
   }): Promise<UserRow> {
     const existing = await this.findByTelegramId(data.telegram_id);
     if (existing) {
+      // Only sync Telegram metadata. first_name/last_name are owned by
+      // completeRegistration and must not be overwritten on every update.
       const [updated] = await this.db('users')
         .where({ telegram_id: data.telegram_id })
-        .update({ ...data, updated_at: this.db.fn.now() })
+        .update({ username: data.username, language_code: data.language_code, updated_at: this.db.fn.now() })
         .returning('*');
       return updated;
     }

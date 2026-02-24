@@ -93,7 +93,7 @@ export class TestHandler implements OnModuleInit {
 
       const sessionId = ctx.session.activeTestSessionId;
       if (!sessionId) {
-        await ctx.reply('❌ Faol test topilmadi.');
+        await ctx.reply('❌ Faol test topilmadi. /start buyrug\'ini yuboring.');
         return;
       }
 
@@ -102,12 +102,23 @@ export class TestHandler implements OnModuleInit {
       const chosenOptionId = parseInt(params[1], 10);
 
       const questionWithOpts = await this.questionRepo.findWithOptions(questionId);
-      if (!questionWithOpts) return;
+      if (!questionWithOpts) {
+        await ctx.reply('❌ Savol topilmadi.');
+        return;
+      }
 
-      const chosenOpt = questionWithOpts.options.find((o) => o.id === chosenOptionId);
+      // Use Number() to handle PostgreSQL returning integer PKs as strings
+      const chosenOpt = questionWithOpts.options.find((o) => Number(o.id) === chosenOptionId);
       const correctOpt = questionWithOpts.options.find((o) => o.is_correct);
 
-      if (!chosenOpt || !correctOpt) return;
+      if (!chosenOpt) {
+        await ctx.reply('❌ Variant topilmadi.');
+        return;
+      }
+      if (!correctOpt) {
+        await ctx.reply('❌ To\'g\'ri javob belgilanmagan. Admin bilan bog\'laning.');
+        return;
+      }
 
       // Record answer
       await this.sessionRepo.recordAnswer({
@@ -121,8 +132,8 @@ export class TestHandler implements OnModuleInit {
       });
 
       const feedback = chosenOpt.is_correct
-        ? '✅ To\'g\'ri!'
-        : `❌ Noto\'g\'ri!\n\nTo\'g\'ri javob: <b>${correctOpt.body_text}</b>`;
+        ? '✅ <b>To\'g\'ri!</b>'
+        : `❌ <b>Noto\'g\'ri!</b>\n\nTo\'g\'ri javob: <b>${correctOpt.body_text}</b>`;
 
       // Move to next question
       const currentIndex = ctx.session.questionIndex ?? 0;
@@ -131,6 +142,7 @@ export class TestHandler implements OnModuleInit {
 
       const isLast = ctx.session.questionIndex >= questionIds.length;
 
+      // Edit the options message to show feedback + navigation button
       await ctx.editMessageText(
         `${ctx.callbackQuery.message?.text ?? ''}\n\n${feedback}`,
         {
@@ -203,36 +215,40 @@ export class TestHandler implements OnModuleInit {
       return;
     }
 
-    const kb = new InlineKeyboard();
-    for (const opt of question.options) {
-      kb.text(opt.body_text, cbData(CB.ANSWER, question.id, opt.id)).row();
-    }
+    // Shuffle options randomly for this display
+    const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const shuffled = [...question.options].sort(() => Math.random() - 0.5);
+    const letters = LETTERS.slice(0, shuffled.length);
 
-    const questionText =
-      `📌 Savol ${index + 1}/${questionIds.length}\n\n` +
-      `${question.body_text ?? '(Media savol)'}`;
+    const questionHeader = `📌 <b>Savol ${index + 1}/${questionIds.length}</b>`;
+    const questionBody = question.body_text ?? '(Media savol)';
+
+    // Build options text and letter keyboard
+    const optionsText = shuffled.map((opt, i) => `(${letters[i]}) ${opt.body_text}`).join('\n');
+
+    const kb = new InlineKeyboard();
+    shuffled.forEach((opt, i) => {
+      kb.text(letters[i], cbData(CB.ANSWER, question.id, opt.id));
+    });
+
+    // Combined message: question + blank line + options, with keyboard attached
+    const fullText = `${questionHeader}\n\n${questionBody}\n\n${optionsText}`;
 
     if (question.media_file_id && question.media_type) {
+      // For media questions: send media first (caption = question only, no options — caption limit 1024),
+      // then send the options+keyboard as a text message
+      const caption = `${questionHeader}\n\n${questionBody}`;
       if (question.media_type === 'image') {
-        await ctx.replyWithPhoto(question.media_file_id, {
-          caption: questionText,
-          reply_markup: kb,
-        });
+        await ctx.replyWithPhoto(question.media_file_id, { caption, parse_mode: 'HTML' });
       } else if (question.media_type === 'audio') {
-        await ctx.replyWithAudio(question.media_file_id, {
-          caption: questionText,
-          reply_markup: kb,
-        });
+        await ctx.replyWithAudio(question.media_file_id, { caption, parse_mode: 'HTML' });
       } else if (question.media_type === 'video') {
-        await ctx.replyWithVideo(question.media_file_id, {
-          caption: questionText,
-          reply_markup: kb,
-        });
-      } else {
-        await ctx.reply(questionText, { reply_markup: kb });
+        await ctx.replyWithVideo(question.media_file_id, { caption, parse_mode: 'HTML' });
       }
+      await ctx.reply(optionsText, { reply_markup: kb });
     } else {
-      await ctx.reply(questionText, { reply_markup: kb });
+      // Text-only question: one message with question + options + keyboard
+      await ctx.reply(fullText, { parse_mode: 'HTML', reply_markup: kb });
     }
   }
 

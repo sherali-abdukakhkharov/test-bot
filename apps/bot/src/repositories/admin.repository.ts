@@ -63,4 +63,8 @@ export class AdminRepository extends BaseRepository {
     const [{ count }] = await this.db('admins').where({ is_approved: true, is_blocked: false }).count('id as count');
     return Number(count);
   }
+
+  async findAllApprovedSuperAdmins(): Promise<AdminRow[]> {
+    return this.db('admins').where({ role: 'super', is_approved: true, is_blocked: false });
+  }
 }

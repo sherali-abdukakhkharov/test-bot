@@ -1,6 +1,5 @@
 import { Context, SessionFlavor } from 'grammy';
 import { HydrateFlavor } from '@grammyjs/hydrate';
-import { ConversationFlavor } from '@grammyjs/conversations';
 import { UserRow } from '@/repositories/user.repository';
 import { AdminRow } from '@/repositories/admin.repository';
 
@@ -22,13 +21,11 @@ export interface SessionData {
 }
 
 export type BotContext = HydrateFlavor<
-  ConversationFlavor<
-    Context &
-      SessionFlavor<SessionData> & {
-        /** Populated by userMiddleware for registered users */
-        dbUser?: UserRow;
-        /** Populated by adminMiddleware for approved admins */
-        dbAdmin?: AdminRow;
-      }
-  >
+  Context &
+    SessionFlavor<SessionData> & {
+      /** Populated by userMiddleware for registered users */
+      dbUser?: UserRow;
+      /** Populated by adminMiddleware for approved admins */
+      dbAdmin?: AdminRow;
+    }
 >;

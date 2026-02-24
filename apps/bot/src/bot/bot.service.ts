@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { Bot, GrammyError, HttpError, session } from 'grammy';
 import { hydrate } from '@grammyjs/hydrate';
 import { autoRetry } from '@grammyjs/auto-retry';
-import { conversations, createConversation } from '@grammyjs/conversations';
 import { freeStorage } from '@grammyjs/storage-free';
 import { BotContext, SessionData } from './context.type';
 import { UserRepository } from '@/repositories/user.repository';
@@ -47,19 +46,11 @@ export class BotService implements OnModuleInit, OnApplicationShutdown {
       }),
     );
 
-    // Conversations plugin
-    this.bot.use(conversations());
-
     // User upsert & block check
     this.bot.use(userMiddleware(this.userRepo));
 
     // Admin detection
     this.bot.use(adminMiddleware(this.adminRepo));
-  }
-
-  /** Register a conversation by name — called from feature modules */
-  registerConversation(name: string, handler: (conversation: any, ctx: BotContext) => Promise<void>) {
-    this.bot.use(createConversation(handler, name));
   }
 
   async onModuleInit() {

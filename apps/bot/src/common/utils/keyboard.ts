@@ -28,12 +28,9 @@ export function mainMenuKeyboard(): Keyboard {
     .resized();
 }
 
-/** Admin main menu reply keyboard */
+/** Admin main menu reply keyboard — minimal, everything else is in the web panel */
 export function adminMenuKeyboard(): Keyboard {
   return new Keyboard()
-    .text('📂 Bo\'limlar').text('📝 Savollar').row()
-    .text('👥 Foydalanuvchilar').text('📊 Statistika').row()
-    .text('📢 E\'lon').text('📖 Qo\'llanma').row()
-    .text('💬 Yordam').text('⚙️ Sozlamalar').row()
+    .text('🌐 Web Panel kirish').row()
     .resized();
 }

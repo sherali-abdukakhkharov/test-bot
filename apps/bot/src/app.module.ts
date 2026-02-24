@@ -11,6 +11,8 @@ import { GuideModule } from '@/modules/guide/guide.module';
 import { LeaderboardModule } from '@/modules/leaderboard/leaderboard.module';
 import { SupportModule } from '@/modules/support/support.module';
 import { AdminModule } from '@/modules/admin/admin.module';
+import { WebAuthModule } from '@/modules/web-auth/web-auth.module';
+import { ApiModule } from '@/api/api.module';
 
 @Module({
   imports: [
@@ -29,8 +31,10 @@ import { AdminModule } from '@/modules/admin/admin.module';
     GuideModule,
     LeaderboardModule,
     SupportModule,
-    // Admin
     AdminModule,
+    // Web API
+    WebAuthModule,
+    ApiModule,
   ],
 })
 export class AppModule {}

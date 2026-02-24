@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { BotService } from '@/bot/bot.service';
 import { RegistrationState } from '@/common/constants/registration-states';
-import { mainMenuKeyboard } from '@/common/utils/keyboard';
+import { adminMenuKeyboard, mainMenuKeyboard } from '@/common/utils/keyboard';
 
 @Injectable()
 export class MainMenuHandler implements OnModuleInit {
@@ -10,18 +10,28 @@ export class MainMenuHandler implements OnModuleInit {
   onModuleInit() {
     const bot = this.botService.bot;
 
-    // Guard: only registered users can access the main menu
     bot.on('message:text', async (ctx, next) => {
+      const text = ctx.message.text;
+
+      // Admin flow: approved admins get their own minimal menu
+      if (ctx.dbAdmin) {
+        // Pass through commands and the web-panel button (handled by WebAuthHandler)
+        if (text.startsWith('/') || text === '🌐 Web Panel kirish') {
+          return next();
+        }
+        // Any other text → show admin menu
+        await ctx.reply('Admin menyu:', { reply_markup: adminMenuKeyboard() });
+        return;
+      }
+
+      // Regular user flow — only registered users see the main menu
       const user = ctx.dbUser;
       if (!user || user.registration_state !== RegistrationState.REGISTERED) {
         return next();
       }
 
-      const text = ctx.message.text;
-
       if (text === '📚 Test ishlash') {
-        // Handled by navigation module — just pass through
-        return next();
+        return next(); // handled by navigation module
       }
 
       if (text === '📖 Qo\'llanma') {
@@ -34,6 +44,11 @@ export class MainMenuHandler implements OnModuleInit {
 
       if (text === '💬 Yordam') {
         return next(); // handled by support module
+      }
+
+      // Pass through commands
+      if (text.startsWith('/')) {
+        return next();
       }
 
       // Unknown text from registered user — show menu

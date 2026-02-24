@@ -14,7 +14,11 @@
       "Read(//Users/sherali/Desktop/Dev/tgbots/test-bot/apps/bot/**)",
       "Bash(__NEW_LINE_fb527eb019e9093b__ echo \"\")",
       "Bash(lsof:*)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(npm create vite@latest apps/web -- --template react-ts --yes)",
+      "Bash(timeout 8 npm run start:prod)"
     ]
   }
 }

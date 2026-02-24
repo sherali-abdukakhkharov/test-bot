@@ -786,27 +786,27 @@ Phase 9  →  Phase 10 →  Phase 16 →  Phase 17
 > **Context**: The project becomes a monorepo to host both the NestJS bot (`apps/bot/`) and the React web admin panel (`apps/web/`), with shared TypeScript types in `packages/shared-types/`.
 
 ### 18.1 npm Workspaces Setup
-- [ ] Add root `package.json` with `"workspaces": ["apps/*", "packages/*"]`
-- [ ] Move all bot files from project root into `apps/bot/`:
+- [x] Add root `package.json` with `"workspaces": ["apps/*", "packages/*"]`
+- [x] Move all bot files from project root into `apps/bot/`:
   - `src/` → `apps/bot/src/`
   - `knexfile.ts` → `apps/bot/knexfile.ts`
   - `migrations/` → `apps/bot/migrations/`
   - `seeds/` → `apps/bot/seeds/`
   - `apps/bot/package.json` (name: `@arab-tili/bot`)
-- [ ] Update `apps/bot/tsconfig.json` path aliases to reflect new root
-- [ ] Update `Makefile` — all targets now cd into `apps/bot/`
-- [ ] Update `docker-compose.dev.yml` — `build: { context: apps/bot }`
-- [ ] Update `Dockerfile` — multi-stage build now references `apps/bot/` and `apps/web/`
+- [x] Update `apps/bot/tsconfig.json` path aliases to reflect new root
+- [x] Update `Makefile` — all targets now cd into `apps/bot/`
+- [x] Update `docker-compose.dev.yml` — `build: { context: apps/bot }`
+- [x] Update `Dockerfile` — multi-stage build now references `apps/bot/` and `apps/web/`
 
 ### 18.2 Shared Types Package
-- [ ] Create `packages/shared-types/package.json` (name: `@arab-tili/shared-types`, no runtime deps)
-- [ ] Create `packages/shared-types/src/index.ts` — export all DTO interfaces shared between bot API and web:
+- [x] Create `packages/shared-types/package.json` (name: `@arab-tili/shared-types`, no runtime deps)
+- [x] Create `packages/shared-types/src/index.ts` — export all DTO interfaces shared between bot API and web:
   ```typescript
   AdminDTO, SectionDTO, TopicDTO, QuestionDTO, AnswerOptionDTO,
   UserDTO, SupportThreadDTO, SupportMessageDTO, GuideItemDTO,
   AnnouncementDTO, DashboardStatsDTO, JwtPayload
   ```
-- [ ] Add `"@arab-tili/shared-types": "*"` as dependency in both `apps/bot/package.json` and `apps/web/package.json`
+- [x] Add `"@arab-tili/shared-types": "*"` as dependency in both `apps/bot/package.json` and `apps/web/package.json`
 
 ---
 
@@ -815,9 +815,9 @@ Phase 9  →  Phase 10 →  Phase 16 →  Phase 17
 > All endpoints under `/api/**`. The same NestJS process serves both the grammY bot and the REST API. Bot webhook/polling runs on the same port.
 
 ### 19.1 Auth Infrastructure
-- [ ] Install: `@nestjs/jwt` `@nestjs/passport` `passport` `passport-jwt` `@types/passport-jwt`
-- [ ] Create `WebAuthModule` (`apps/bot/src/modules/web-auth/`)
-- [ ] `OtpService` — in-memory Map store for 6-digit codes:
+- [x] Install: `@nestjs/jwt` `@nestjs/passport` `passport` `passport-jwt` `@types/passport-jwt`
+- [x] Create `WebAuthModule` (`apps/bot/src/modules/web-auth/`)
+- [x] `OtpService` — in-memory Map store for 6-digit codes:
   ```typescript
   interface OtpEntry {
     adminId: number;
@@ -830,16 +830,16 @@ Phase 9  →  Phase 10 →  Phase 16 →  Phase 17
   consume(code): OtpEntry | null  // validates: exists, not used, not expired → marks used=true
   // setInterval every 60s: prune expired entries from Map
   ```
-- [ ] `JwtStrategy` — `passport-jwt` Bearer strategy; loads admin row from DB via `payload.sub`
-- [ ] `AdminJwtGuard` — applies JWT auth to all `/api/**` routes (except `/api/auth/otp`)
-- [ ] `SuperAdminGuard` — checks `payload.role === 'super'`; applied on `/api/admins` and `/api/settings`
-- [ ] Configure CORS in `main.ts`: allow `http://localhost:5173` (dev) and production domain
-- [ ] Set up `@nestjs/swagger` at `/api/docs` (disabled in production)
+- [x] `JwtStrategy` — `passport-jwt` Bearer strategy; loads admin row from DB via `payload.sub`
+- [x] `AdminJwtGuard` — applies JWT auth to all `/api/**` routes (except `/api/auth/otp`)
+- [x] `SuperAdminGuard` — checks `payload.role === 'super'`; applied on `/api/admins` and `/api/settings`
+- [x] Configure CORS in `main.ts`: allow `http://localhost:5173` (dev) and production domain
+- [x] Set up `@nestjs/swagger` at `/api/docs` (disabled in production)
 
 ### 19.2 Bot Command: `/weblogin`
-- [ ] Handler in `WebAuthModule` — only accessible to approved, non-blocked admins
-- [ ] Calls `OtpService.generate(admin)` → gets code
-- [ ] Sends message with monospace code (Markdown parse mode):
+- [x] Handler in `WebAuthModule` — only accessible to approved, non-blocked admins
+- [x] Calls `OtpService.generate(admin)` → gets code
+- [x] Sends message with monospace code (Markdown parse mode):
   ```
   🔐 Web panel uchun kodingiz:
   `123456`
@@ -847,77 +847,77 @@ Phase 9  →  Phase 10 →  Phase 16 →  Phase 17
   ```
 
 ### 19.3 Auth Controller (`POST /api/auth/otp`, `GET /api/auth/me`)
-- [ ] `POST /api/auth/otp` — public:
+- [x] `POST /api/auth/otp` — public:
   - `OtpService.consume(code)` → null = 401 "Kod noto'g'ri yoki muddati o'tgan"
   - Valid → `JwtService.sign({ sub, telegramId, role }, { expiresIn: '8h' })`
   - Returns `{ accessToken, role, expiresAt }`
-- [ ] `GET /api/auth/me` — protected: returns current admin DTO
+- [x] `GET /api/auth/me` — protected: returns current admin DTO
 
 ### 19.4 Sections API (`/api/sections`)
-- [ ] `GET /api/sections` — flat list, `?includeDeleted=false`
-- [ ] `GET /api/sections/tree` — nested `{ id, title, children[] }` structure
-- [ ] `POST /api/sections` — create; validate: title required, parentId valid if provided
-- [ ] `PATCH /api/sections/:id` — partial update any field
-- [ ] `DELETE /api/sections/:id` — soft delete (`is_deleted = true`)
-- [ ] `PATCH /api/sections/reorder` — body: `[{ id, sortOrder }]`
+- [x] `GET /api/sections` — flat list, `?includeDeleted=false`
+- [x] `GET /api/sections/tree` — nested `{ id, title, children[] }` structure
+- [x] `POST /api/sections` — create; validate: title required, parentId valid if provided
+- [x] `PATCH /api/sections/:id` — partial update any field
+- [x] `DELETE /api/sections/:id` — soft delete (`is_deleted = true`)
+- [x] `PATCH /api/sections/reorder` — body: `[{ id, sortOrder }]`
 
 ### 19.5 Topics API (`/api/topics`)
-- [ ] `GET /api/topics?sectionId=` — list with `questionCount` aggregate
-- [ ] `POST /api/topics` — create; validate: sectionId, options_count ∈ {3,4}, time_per_question_sec ∈ {5,10,15,20,25,30,45,60}
-- [ ] `PATCH /api/topics/:id` — partial update
-- [ ] `DELETE /api/topics/:id` — soft delete
-- [ ] `PATCH /api/topics/reorder` — body: `[{ id, sortOrder }]`
+- [x] `GET /api/topics?sectionId=` — list with `questionCount` aggregate
+- [x] `POST /api/topics` — create; validate: sectionId, options_count ∈ {3,4}, time_per_question_sec ∈ {5,10,15,20,25,30,45,60}
+- [x] `PATCH /api/topics/:id` — partial update
+- [x] `DELETE /api/topics/:id` — soft delete
+- [x] `PATCH /api/topics/reorder` — body: `[{ id, sortOrder }]`
 
 ### 19.6 Questions API (`/api/questions`)
-- [ ] `GET /api/questions?topicId=` — paginated (`?page=1&limit=20`) with nested options
-- [ ] `POST /api/questions` — create question + options in transaction; validate exactly 1 `isCorrect`
-- [ ] `PATCH /api/questions/:id` — update body/media
-- [ ] `DELETE /api/questions/:id` — soft delete
-- [ ] `POST /api/questions/bulk-import` — `multipart/form-data` file upload:
+- [x] `GET /api/questions?topicId=` — paginated (`?page=1&limit=20`) with nested options
+- [x] `POST /api/questions` — create question + options in transaction; validate exactly 1 `isCorrect`
+- [x] `PATCH /api/questions/:id` — update body/media
+- [x] `DELETE /api/questions/:id` — soft delete
+- [x] `POST /api/questions/bulk-import` — `multipart/form-data` file upload:
   - Parse `.xlsx` with `exceljs`, `.csv` with `papaparse`
   - Columns: `Question | CorrectAnswer | Option2 | Option3 | Option4?`
   - Run in transaction; return `{ imported, failed, errors[] }`
-- [ ] `PATCH /api/answer-options/:id` — update single option
+- [x] `PATCH /api/answer-options/:id` — update single option
 
 ### 19.7 Users API (`/api/users`)
-- [ ] `GET /api/users` — paginated; `?page&limit&search&isBlocked`
-- [ ] `GET /api/users/:id/results` — last 20 test sessions for a user
-- [ ] `PATCH /api/users/:id/block` — toggle `is_blocked`
+- [x] `GET /api/users` — paginated; `?page&limit&search&isBlocked`
+- [x] `GET /api/users/:id/results` — last 20 test sessions for a user
+- [x] `PATCH /api/users/:id/block` — toggle `is_blocked`
 
 ### 19.8 Admins API (`/api/admins`) — super admin only
-- [ ] `GET /api/admins` — all admins with status
-- [ ] `PATCH /api/admins/:id/approve` — set approved; notify user via bot
-- [ ] `PATCH /api/admins/:id/reject` — delete row
-- [ ] `PATCH /api/admins/:id/block` — toggle blocked, reset failed_attempt_count
+- [x] `GET /api/admins` — all admins with status
+- [x] `PATCH /api/admins/:id/approve` — set approved; notify user via bot
+- [x] `PATCH /api/admins/:id/reject` — delete row
+- [x] `PATCH /api/admins/:id/block` — toggle blocked, reset failed_attempt_count
 
 ### 19.9 Statistics API (`/api/statistics`)
-- [ ] `GET /api/statistics/overview` — `DashboardStatsDTO`
-- [ ] `GET /api/statistics/export` — stream `.xlsx` file
-- [ ] `GET /api/statistics/leaderboard` — top 40 with user details
+- [x] `GET /api/statistics/overview` — `DashboardStatsDTO`
+- [x] `GET /api/statistics/export` — stream `.xlsx` file
+- [x] `GET /api/statistics/leaderboard` — top 40 with user details
 
 ### 19.10 Guide API (`/api/guide`)
-- [ ] `GET /api/guide` — all items ordered by sort_order
-- [ ] `POST /api/guide` — create item
-- [ ] `PATCH /api/guide/:id` — update
-- [ ] `DELETE /api/guide/:id` — hard delete (guide items aren't referenced by FKs)
-- [ ] `PATCH /api/guide/reorder` — body: `[{ id, sortOrder }]`
+- [x] `GET /api/guide` — all items ordered by sort_order
+- [x] `POST /api/guide` — create item
+- [x] `PATCH /api/guide/:id` — update
+- [x] `DELETE /api/guide/:id` — hard delete (guide items aren't referenced by FKs)
+- [x] `PATCH /api/guide/reorder` — body: `[{ id, sortOrder }]`
 
 ### 19.11 Announcements API (`/api/announcements`)
-- [ ] `GET /api/announcements` — list with expired flag computed at query time
-- [ ] `POST /api/announcements` — insert + trigger async broadcast via bot
-- [ ] `GET /api/announcements/:id/stats` — delivery counts
+- [x] `GET /api/announcements` — list with expired flag computed at query time
+- [x] `POST /api/announcements` — insert + trigger async broadcast via bot
+- [x] `GET /api/announcements/:id/stats` — delivery counts
 
 ### 19.12 Support API (`/api/support`)
-- [ ] `GET /api/support/threads` — paginated, `?status=open|claimed|closed`
-- [ ] `GET /api/support/threads/:id/messages` — full message history
-- [ ] `POST /api/support/threads/:id/messages` — admin reply; deliver to user via `bot.api.sendMessage()`
-- [ ] `PATCH /api/support/threads/:id/claim` — atomic claim (WHERE claimed_by IS NULL; super admin bypasses)
-- [ ] `PATCH /api/support/threads/:id/close` — set status = closed
+- [x] `GET /api/support/threads` — paginated, `?status=open|claimed|closed`
+- [x] `GET /api/support/threads/:id/messages` — full message history
+- [x] `POST /api/support/threads/:id/messages` — admin reply; deliver to user via `bot.api.sendMessage()`
+- [x] `PATCH /api/support/threads/:id/claim` — atomic claim (WHERE claimed_by IS NULL; super admin bypasses)
+- [x] `PATCH /api/support/threads/:id/close` — set status = closed
 
 ### 19.13 Settings API (`/api/settings`) — super admin only
-- [ ] `GET /api/settings` — `{ adminSharedPasswordSet: boolean, superAdminPasswordSet: boolean }`
-- [ ] `PATCH /api/settings/admin-password` — bcrypt hash new password → upsert in settings table
-- [ ] `PATCH /api/settings/super-password` — same for super admin password
+- [x] `GET /api/settings` — `{ adminSharedPasswordSet: boolean, superAdminPasswordSet: boolean }`
+- [x] `PATCH /api/settings/admin-password` — bcrypt hash new password → upsert in settings table
+- [x] `PATCH /api/settings/super-password` — same for super admin password
 
 ---
 
@@ -926,120 +926,120 @@ Phase 9  →  Phase 10 →  Phase 16 →  Phase 17
 > **Stack**: React 18 + Vite + TypeScript · shadcn/ui · Tailwind CSS · TanStack Query · React Router v6 · Axios · dnd-kit · recharts
 
 ### 20.1 Project Setup (`apps/web/`)
-- [ ] `npm create vite@latest . -- --template react-ts`
-- [ ] Install runtime deps:
+- [x] `npm create vite@latest . -- --template react-ts`
+- [x] Install runtime deps:
   `react-router-dom@6` `axios` `@tanstack/react-query` `@tanstack/react-query-devtools`
   `lucide-react` `recharts` `@dnd-kit/core` `@dnd-kit/sortable` `@dnd-kit/utilities`
   `react-hook-form` `@hookform/resolvers` `zod` `date-fns`
-- [ ] Install and init Tailwind: `tailwindcss` `postcss` `autoprefixer`
-- [ ] Install and init shadcn/ui: `npx shadcn@latest init` (New York style, slate base color)
-- [ ] Add shadcn/ui components: `button` `input` `card` `table` `dialog` `dropdown-menu` `badge`
+- [x] Install and init Tailwind: `tailwindcss` `postcss` `autoprefixer`
+- [x] Install and init shadcn/ui: `npx shadcn@latest init` (New York style, slate base color)
+- [x] Add shadcn/ui components: `button` `input` `card` `table` `dialog` `dropdown-menu` `badge`
   `alert` `tabs` `select` `textarea` `sheet` `separator` `skeleton` `sonner` `collapsible`
-- [ ] Configure `vite.config.ts`: proxy `/api → http://localhost:3000` in dev mode
-- [ ] Add `@arab-tili/shared-types` import from workspace
+- [x] Configure `vite.config.ts`: proxy `/api → http://localhost:3000` in dev mode
+- [x] Add `@arab-tili/shared-types` import from workspace
 
 ### 20.2 Auth Layer
-- [ ] `src/lib/auth.ts` — JWT helpers (localStorage get/set/clear, `isTokenValid()` checking exp, `getRole()`)
-- [ ] `src/lib/api.ts` — Axios instance:
+- [x] `src/lib/auth.ts` — JWT helpers (localStorage get/set/clear, `isTokenValid()` checking exp, `getRole()`)
+- [x] `src/lib/api.ts` — Axios instance:
   - `baseURL: '/api'`
   - Request interceptor: inject `Authorization: Bearer <token>`
   - Response interceptor: 401 → `clearToken()` → `navigate('/login')`
-- [ ] `src/contexts/AuthContext.tsx` — provides `{ admin, role, isLoading, logout }` app-wide
+- [x] `src/contexts/AuthContext.tsx` — provides `{ admin, role, isLoading, logout }` app-wide
 
 ### 20.3 Router & Layout
-- [ ] `src/router.tsx` — React Router v6 routes with `<ProtectedRoute>` and `<SuperAdminRoute>` wrappers
-- [ ] `src/components/layout/AppLayout.tsx` — sidebar + topbar shell
-- [ ] `src/components/layout/Sidebar.tsx` — nav links filtered by `role`; active state highlighting
-- [ ] `src/components/layout/Header.tsx` — current admin name + logout button
+- [x] `src/router.tsx` — React Router v6 routes with `<ProtectedRoute>` and `<SuperAdminRoute>` wrappers
+- [x] `src/components/layout/AppLayout.tsx` — sidebar + topbar shell
+- [x] `src/components/layout/Sidebar.tsx` — nav links filtered by `role`; active state highlighting
+- [x] `src/components/layout/Header.tsx` — current admin name + logout button
 
 ### 20.4 Login Page (`/login`)
-- [ ] Centered card with bot logo
-- [ ] Instruction text: send `/weblogin` in bot → enter 6-digit code
-- [ ] Single 6-digit OTP input (number-only, auto-submit on 6th digit)
-- [ ] Loading + error states; "Kod 15 soniya amal qiladi" hint text
-- [ ] On success: `setToken(accessToken)` → `navigate('/')`
+- [x] Centered card with bot logo
+- [x] Instruction text: send `/weblogin` in bot → enter 6-digit code
+- [x] Single 6-digit OTP input (number-only, auto-submit on 6th digit)
+- [x] Loading + error states; "Kod 15 soniya amal qiladi" hint text
+- [x] On success: `setToken(accessToken)` → `navigate('/')`
 
 ### 20.5 Dashboard (`/`)
-- [ ] 4 stat cards: Total Users | Today Registered | Total Test Sessions | Today Sessions
-- [ ] Open support threads table (up to 5 rows) with "View All" link
-- [ ] Quick action buttons: Content, Users, Support
+- [x] 4 stat cards: Total Users | Today Registered | Total Test Sessions | Today Sessions
+- [x] Open support threads table (up to 5 rows) with "View All" link
+- [x] Quick action buttons: Content, Users, Support
 
 ### 20.6 Content Page (`/content`)
-- [ ] Split layout: left 1/3 = section tree, right 2/3 = topic table
-- [ ] **Section tree** (dnd-kit for reorder within same parent):
+- [x] Split layout: left 1/3 = section tree, right 2/3 = topic table
+- [x] **Section tree** (dnd-kit for reorder within same parent):
   - Collapsible nodes, indent per level
   - Each node: title, lock badge, Edit, Delete, Add Child buttons
   - "➕ Root Section" button at top
-- [ ] **Topic table** (visible after selecting a section):
+- [x] **Topic table** (visible after selecting a section):
   - Columns: Title | Questions | Time/Q | Options | Daily Limit | Lock | Actions
   - "➕ Add Topic" + drag handles for reorder
   - "📝 Questions" button → navigate to `/questions/:topicId`
-- [ ] **Section/Topic form Dialog** (shared, controlled by `mode='section'|'topic'`):
+- [x] **Section/Topic form Dialog** (shared, controlled by `mode='section'|'topic'`):
   - Title, description, sort_order
   - Lock toggle → prerequisite picker (shadcn Select with full section/topic list)
   - Topic extras: time (5–60s select), options count (3 or 4), daily limit
 
 ### 20.7 Questions Page (`/questions/:topicId`)
-- [ ] Breadcrumb from API: `SectionName > TopicName > Questions`
-- [ ] Toolbar: "➕ Add" | "📥 Bulk Import" | topic config summary chips
-- [ ] Paginated question cards (20/page):
+- [x] Breadcrumb from API: `SectionName > TopicName > Questions`
+- [x] Toolbar: "➕ Add" | "📥 Bulk Import" | topic config summary chips
+- [x] Paginated question cards (20/page):
   - Question text (truncated) + media type badge
   - Answer options listed — correct one highlighted with green badge
   - Drag handle + Edit + Delete actions
-- [ ] **Question form Dialog**:
+- [x] **Question form Dialog**:
   - Textarea (optional) + media type select + file_id input (optional; at least one required)
   - `n` answer option inputs; radio button for correct; validation via zod
-- [ ] **Bulk Import Sheet (right-side drawer)**:
+- [x] **Bulk Import Sheet (right-side drawer)**:
   - "Download Template" button → generates and downloads empty `.xlsx`
   - File drop zone (`.xlsx` / `.csv`)
   - Preview table of parsed rows with per-row validation badges
   - Import button → progress indicator → result summary
 
 ### 20.8 Users Page (`/users`)
-- [ ] Paginated data table with search (by name or Telegram ID) and filter (All/Active/Blocked)
-- [ ] Columns: Full Name | Telegram ID | Joined | Status (badge) | Actions
-- [ ] Row actions: "View Results" (opens Sheet with last 20 test sessions) | Block/Unblock (with confirm dialog)
+- [x] Paginated data table with search (by name or Telegram ID) and filter (All/Active/Blocked)
+- [x] Columns: Full Name | Telegram ID | Joined | Status (badge) | Actions
+- [x] Row actions: "View Results" (opens Sheet with last 20 test sessions) | Block/Unblock (with confirm dialog)
 
 ### 20.9 Admins Page (`/admins`) — super admin only
-- [ ] Pending section at top (highlighted alert): list of unapproved admins with Approve/Reject
-- [ ] Full table: Name/TgID | Role badge | Approved | Blocked | Joined | Actions
-- [ ] Block/Unblock confirmation dialog
+- [x] Pending section at top (highlighted alert): list of unapproved admins with Approve/Reject
+- [x] Full table: Name/TgID | Role badge | Approved | Blocked | Joined | Actions
+- [x] Block/Unblock confirmation dialog
 
 ### 20.10 Statistics Page (`/statistics`)
-- [ ] Stat cards + charts (recharts):
+- [x] Stat cards + charts (recharts):
   - Line chart: daily user registrations (last 30 days)
   - Bar chart: daily test sessions (last 30 days)
-- [ ] Leaderboard table: rank, name, avg score, topics solved
-- [ ] "📥 Download Excel" → `GET /api/statistics/export` → `<a download>` trigger
+- [x] Leaderboard table: rank, name, avg score, topics solved
+- [x] "📥 Download Excel" → `GET /api/statistics/export` → `<a download>` trigger
 
 ### 20.11 Guide Page (`/guide`)
-- [ ] Drag-to-reorder list (dnd-kit); auto-PATCH on drop
-- [ ] Each item: content type badge + text preview or video file_id + active toggle + Edit + Delete
-- [ ] "➕ Add Item" Dialog: type selector → textarea (text) or file_id input (video); max 20 items enforced
+- [x] Drag-to-reorder list (dnd-kit); auto-PATCH on drop
+- [x] Each item: content type badge + text preview or video file_id + active toggle + Edit + Delete
+- [x] "➕ Add Item" Dialog: type selector → textarea (text) or file_id input (video); max 20 items enforced
 
 ### 20.12 Announcements Page (`/announcements`)
-- [ ] "📢 Create" button → Dialog: text area + media type + file_id + preview + "Send to {n} users" confirm
-- [ ] Table: date | preview | expired badge | sent/failed counts
-- [ ] Poll `/api/announcements/:id/stats` every 2s while broadcast is in progress
+- [x] "📢 Create" button → Dialog: text area + media type + file_id + preview + "Send to {n} users" confirm
+- [x] Table: date | preview | expired badge | sent/failed counts
+- [x] Poll `/api/announcements/:id/stats` every 2s while broadcast is in progress
 
 ### 20.13 Support Page (`/support`)
-- [ ] Two-panel layout: thread list left, message panel right
-- [ ] Thread list: status filter tabs (Open / Claimed / Closed / All), search by user name
-- [ ] Each thread: user name, message preview, time, status badge; click → load messages
-- [ ] Message panel: scrollable history with user (left/gray) and admin (right/blue) bubbles
-- [ ] Bottom: text input + Send; "Claim" button (unclaimed only); "Close Thread" button
-- [ ] Poll messages every 5s while a thread is open
+- [x] Two-panel layout: thread list left, message panel right
+- [x] Thread list: status filter tabs (Open / Claimed / Closed / All), search by user name
+- [x] Each thread: user name, message preview, time, status badge; click → load messages
+- [x] Message panel: scrollable history with user (left/gray) and admin (right/blue) bubbles
+- [x] Bottom: text input + Send; "Claim" button (unclaimed only); "Close Thread" button
+- [x] Poll messages every 5s while a thread is open
 
 ### 20.14 Settings Page (`/settings`) — super admin only
-- [ ] Card: Change Admin Shared Password (new + confirm inputs + Save; shows success toast)
-- [ ] Card: Change Super Admin Password (same)
-- [ ] Card: Bot info (masked token, read-only)
+- [x] Card: Change Admin Shared Password (new + confirm inputs + Save; shows success toast)
+- [x] Card: Change Super Admin Password (same)
+- [x] Card: Bot info (masked token, read-only)
 
 ### 20.15 Production Build & Serving
-- [ ] `apps/web/vite.config.ts` — `build.outDir = '../bot/public'` (output into bot's static folder)
-- [ ] `apps/bot/src/main.ts` — `app.useStaticAssets(join(__dirname, '..', 'public'))` + SPA catch-all for non-API routes
-- [ ] `Dockerfile` — stage 1: build web → stage 2: build bot → stage 3: runner copies both artifacts
-- [ ] CI/CD: add `npm run build --workspace=apps/web` step before bot build
+- [x] `apps/web/vite.config.ts` — `build.outDir = '../bot/public'` (output into bot's static folder)
+- [x] `apps/bot/src/main.ts` — `app.useStaticAssets(join(__dirname, '..', 'public'))` + SPA catch-all for non-API routes
+- [x] `Dockerfile` — stage 1: build web → stage 2: build bot → stage 3: runner copies both artifacts
+- [x] CI/CD: add `npm run build --workspace=apps/web` step before bot build
 
 ---
 
