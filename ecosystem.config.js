@@ -14,7 +14,7 @@
  *   DATABASE_URL=
  *   JWT_SECRET=
  *   JWT_EXPIRES_IN=8h
- *   PORT=3000
+ *   PORT=3737  (overridden by env_production above, but keep in sync)
  *   CORS_ORIGINS=https://yourdomain.com
  */
 
@@ -23,8 +23,8 @@ module.exports = {
     {
       name: 'arab-tili-bot',
 
-      // Entry point — NestJS compiles to dist/apps/bot/src/main.js inside apps/bot/
-      script: 'dist/apps/bot/src/main.js',
+      // Entry point — NestJS compiles to apps/bot/dist/src/main.js
+      script: 'dist/src/main.js',
       cwd: './apps/bot',
 
       // Telegram long-polling must run on exactly ONE process
@@ -39,9 +39,11 @@ module.exports = {
       max_restarts: 10,
       min_uptime: '10s',     // crash-loop guard
 
-      // NestJS reads remaining secrets from apps/bot/.env via ConfigModule
+      // Non-secret production env vars — set here so PM2 always injects them explicitly.
+      // Secrets (BOT_TOKEN, DATABASE_URL, JWT_SECRET, etc.) stay in apps/bot/.env
       env_production: {
         NODE_ENV: 'production',
+        PORT: 3737,
       },
 
       // Logs — written relative to cwd (apps/bot/logs/)
