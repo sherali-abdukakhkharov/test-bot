@@ -154,6 +154,10 @@ export class SupportHandler implements OnModuleInit {
 
       const thread = await this.supportRepo.findThreadById(threadId);
       if (!thread) return;
+      if (thread.status === 'closed') {
+        await ctx.reply(`ℹ️ Thread #${threadId} allaqachon yopilgan.`);
+        return;
+      }
 
       await this.supportRepo.closeThread(threadId);
 
