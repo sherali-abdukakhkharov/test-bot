@@ -74,6 +74,11 @@ export class TestSessionRepository extends BaseRepository {
     await this.db('test_sessions').where({ id }).update({ status: 'abandoned', finished_at: this.db.fn.now() });
   }
 
+  async hasAnswer(sessionId: bigint, questionId: number): Promise<boolean> {
+    const row = await this.db('test_answers').where({ session_id: sessionId, question_id: questionId }).first();
+    return !!row;
+  }
+
   async recordAnswer(data: Omit<TestAnswerRow, 'id' | 'answered_at'>): Promise<void> {
     await this.db('test_answers').insert(data);
   }
