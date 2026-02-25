@@ -139,6 +139,14 @@ The bot reads `.env` from `apps/bot/` via `dotenv/config` and `@nestjs/config`.
 
 ---
 
+## Git Workflow
+
+- **One branch per task** — create a new `claude/<short-description>-<id>` branch at the start of every task. PRs are merged and branches are deleted after each task.
+- **Branch naming**: `claude/<kebab-description>-<session-suffix>` (e.g. `claude/fix-support-names-DGIHr`)
+- **Always push** the branch and open a PR when the task is done.
+
+---
+
 ## Key Conventions
 
 - **TypeScript strict mode** is enabled in both apps

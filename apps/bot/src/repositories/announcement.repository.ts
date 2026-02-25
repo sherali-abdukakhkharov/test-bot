@@ -7,7 +7,7 @@ export interface AnnouncementRow {
   body_text: string | null;
   media_type: string | null;
   media_file_id: string | null;
-  expires_at: Date;
+  expires_at: Date | null;
   created_at: Date;
 }
 
