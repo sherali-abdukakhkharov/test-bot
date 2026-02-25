@@ -36,8 +36,9 @@ export class SupportHandler implements OnModuleInit {
 
       const thread = await this.supportRepo.createThread(user.id);
       await ctx.reply(
-        '💬 <b>Yordam so\'rovi yaratildi!</b>\n\n' +
-          'Muammoingizni yoki savolingizni yozing. Admin tez orada javob beradi.',
+        `💬 <b>Yordam so'rovi yaratildi!</b>\n\n` +
+          `So'rov raqami: <b>#${thread.id}</b>\n\n` +
+          `Muammoingizni yoki savolingizni yozing. Admin tez orada javob beradi.`,
         { parse_mode: 'HTML' },
       );
 
@@ -145,7 +146,8 @@ export class SupportHandler implements OnModuleInit {
         if (threadUser) {
           await bot.api.sendMessage(
             threadUser.telegram_id,
-            '✅ Yordam so\'rovingiz yopildi. Agar boshqa savollaringiz bo\'lsa, "💬 Yordam" tugmasini bosing.',
+            `✅ So'rov <b>#${threadId}</b> yopildi. Agar boshqa savollaringiz bo'lsa, "💬 Yordam" tugmasini bosing.`,
+            { parse_mode: 'HTML' },
           );
         }
       } catch {
