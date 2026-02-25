@@ -48,7 +48,7 @@ export class AnnouncementsController {
       body_text: dto.bodyText ?? null,
       media_type: dto.mediaType ?? null,
       media_file_id: dto.mediaFileId ?? null,
-      expires_at: null,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
     // Broadcast asynchronously — don't await
