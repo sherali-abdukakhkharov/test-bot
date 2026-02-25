@@ -42,7 +42,7 @@ export class SupportController {
     const { rows, total } = await this.supportRepo.findThreads(status, pageNum, limitNum);
 
     const data = await Promise.all(rows.map(async (row) => {
-      const user = await this.userRepo.findByTelegramId(String(row.user_id));
+      const user = await this.userRepo.findById(row.user_id);
       return this.toThreadDto(row, user?.first_name ?? null, user?.last_name ?? null);
     }));
 
@@ -78,7 +78,7 @@ export class SupportController {
     });
 
     // Deliver to user via Telegram
-    const user = await this.userRepo.findByTelegramId(String(thread.user_id));
+    const user = await this.userRepo.findById(thread.user_id);
     if (user && !user.is_blocked) {
       try {
         await this.botService.bot.api.sendMessage(
