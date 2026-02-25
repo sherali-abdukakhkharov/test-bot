@@ -3,6 +3,7 @@ import { InlineKeyboard } from 'grammy';
 import { BotService } from '@/bot/bot.service';
 import { SupportRepository } from '@/repositories/support.repository';
 import { AdminRepository } from '@/repositories/admin.repository';
+import { UserRepository } from '@/repositories/user.repository';
 import { RegistrationState } from '@/common/constants/registration-states';
 import { CB, cbData, parseCb } from '@/common/constants/callbacks';
 import { displayName } from '@/common/utils/format';
@@ -13,6 +14,7 @@ export class SupportHandler implements OnModuleInit {
     private readonly botService: BotService,
     private readonly supportRepo: SupportRepository,
     private readonly adminRepo: AdminRepository,
+    private readonly userRepo: UserRepository,
   ) {}
 
   onModuleInit() {
@@ -139,10 +141,13 @@ export class SupportHandler implements OnModuleInit {
 
       // Notify user
       try {
-        await bot.api.sendMessage(
-          String(thread.user_id),
-          '✅ Yordam so\'rovingiz yopildi. Agar boshqa savollaringiz bo\'lsa, "💬 Yordam" tugmasini bosing.',
-        );
+        const threadUser = await this.userRepo.findById(thread.user_id);
+        if (threadUser) {
+          await bot.api.sendMessage(
+            threadUser.telegram_id,
+            '✅ Yordam so\'rovingiz yopildi. Agar boshqa savollaringiz bo\'lsa, "💬 Yordam" tugmasini bosing.',
+          );
+        }
       } catch {
         // user may have blocked bot
       }

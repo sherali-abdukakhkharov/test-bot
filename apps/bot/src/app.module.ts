@@ -25,12 +25,12 @@ import { ApiModule } from '@/api/api.module';
     BotModule,
     // Feature modules
     RegistrationModule,
-    MainMenuModule,
     NavigationModule,
     TestModule,
     GuideModule,
     LeaderboardModule,
     SupportModule,
+    MainMenuModule,
     AdminModule,
     // Web API
     WebAuthModule,
