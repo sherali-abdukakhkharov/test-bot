@@ -10,6 +10,13 @@ export interface SupportThreadRow {
   updated_at: Date;
 }
 
+export interface SupportThreadNotificationRow {
+  id: number;
+  thread_id: bigint;
+  admin_telegram_id: bigint;
+  message_id: bigint;
+}
+
 export interface SupportMessageRow {
   id: bigint;
   thread_id: bigint;
@@ -53,6 +60,22 @@ export class SupportRepository extends BaseRepository {
     await this.db('support_threads')
       .where({ id: threadId, status: 'open' })
       .update({ status: 'claimed', claimed_by: adminId, updated_at: this.db.fn.now() });
+  }
+
+  async saveAdminNotification(threadId: bigint, adminTelegramId: number | string, messageId: number): Promise<void> {
+    await this.db('support_thread_notifications').insert({
+      thread_id: threadId,
+      admin_telegram_id: adminTelegramId,
+      message_id: messageId,
+    });
+  }
+
+  async findAdminNotifications(threadId: bigint): Promise<SupportThreadNotificationRow[]> {
+    return this.db('support_thread_notifications').where({ thread_id: threadId });
+  }
+
+  async deleteAdminNotifications(threadId: bigint): Promise<void> {
+    await this.db('support_thread_notifications').where({ thread_id: threadId }).delete();
   }
 
   async closeThread(threadId: bigint): Promise<void> {
