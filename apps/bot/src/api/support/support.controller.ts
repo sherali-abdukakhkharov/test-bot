@@ -99,7 +99,25 @@ export class SupportController {
     @Param('id') id: string,
     @Request() req: { user: { sub: number } },
   ): Promise<{ success: boolean }> {
-    await this.supportRepo.claimThread(BigInt(id), req.user.sub);
+    const threadId = BigInt(id);
+    const thread = await this.supportRepo.findThreadById(threadId);
+    if (!thread) throw new NotFoundException('Thread not found');
+
+    await this.supportRepo.claimThread(threadId, req.user.sub);
+
+    const user = await this.userRepo.findById(thread.user_id);
+    if (user && !user.is_blocked) {
+      try {
+        await this.botService.bot.api.sendMessage(
+          user.telegram_id,
+          `👤 So'rov <b>#${threadId}</b> admin tomonidan qabul qilindi. Tez orada javob beriladi.`,
+          { parse_mode: 'HTML' },
+        );
+      } catch {
+        // delivery failure is non-fatal
+      }
+    }
+
     return { success: true };
   }
 

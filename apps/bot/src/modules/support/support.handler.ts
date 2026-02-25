@@ -124,6 +124,23 @@ export class SupportHandler implements OnModuleInit {
 
       await this.supportRepo.claimThread(threadId, admin.id);
       await ctx.reply(`✅ Thread #${threadId} siz tomondan qabul qilindi.`);
+
+      // Notify user
+      const thread = await this.supportRepo.findThreadById(threadId);
+      if (thread) {
+        const threadUser = await this.userRepo.findById(thread.user_id);
+        if (threadUser) {
+          try {
+            await bot.api.sendMessage(
+              threadUser.telegram_id,
+              `👤 So'rov <b>#${threadId}</b> admin tomonidan qabul qilindi. Tez orada javob beriladi.`,
+              { parse_mode: 'HTML' },
+            );
+          } catch {
+            // user may have blocked bot
+          }
+        }
+      }
     });
 
     // Admin closes a thread
