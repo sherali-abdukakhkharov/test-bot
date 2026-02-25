@@ -17,6 +17,20 @@ export class SupportHandler implements OnModuleInit {
     private readonly userRepo: UserRepository,
   ) {}
 
+  /** Delete the new-thread notification messages from all admins' chats. */
+  private async deleteAdminNotifications(threadId: bigint): Promise<void> {
+    const bot = this.botService.bot;
+    const notifications = await this.supportRepo.findAdminNotifications(threadId);
+    for (const n of notifications) {
+      try {
+        await bot.api.deleteMessage(String(n.admin_telegram_id), Number(n.message_id));
+      } catch {
+        // Message may already be deleted
+      }
+    }
+    await this.supportRepo.deleteAdminNotifications(threadId);
+  }
+
   onModuleInit() {
     const bot = this.botService.bot;
 
@@ -48,7 +62,7 @@ export class SupportHandler implements OnModuleInit {
       for (const admin of admins) {
         if (!admin.is_approved || admin.is_blocked) continue;
         try {
-          await bot.api.sendMessage(
+          const sent = await bot.api.sendMessage(
             admin.telegram_id,
             `🆕 Yangi yordam so\'rovi!\n\n` +
               `👤 Foydalanuvchi: <b>${userName}</b>\n` +
@@ -60,6 +74,7 @@ export class SupportHandler implements OnModuleInit {
                 .text('❌ Yopish', cbData(CB.SUPPORT_CLOSE, String(thread.id))),
             },
           );
+          await this.supportRepo.saveAdminNotification(thread.id, admin.telegram_id, sent.message_id);
         } catch {
           // Admin may have blocked the bot — skip
         }
@@ -123,6 +138,7 @@ export class SupportHandler implements OnModuleInit {
       const threadId = BigInt(params[0]);
 
       await this.supportRepo.claimThread(threadId, admin.id);
+      await this.deleteAdminNotifications(threadId);
       await ctx.reply(`✅ Thread #${threadId} siz tomondan qabul qilindi.`);
 
       // Notify user
@@ -154,8 +170,13 @@ export class SupportHandler implements OnModuleInit {
 
       const thread = await this.supportRepo.findThreadById(threadId);
       if (!thread) return;
+      if (thread.status === 'closed') {
+        await ctx.reply(`ℹ️ Thread #${threadId} allaqachon yopilgan.`);
+        return;
+      }
 
       await this.supportRepo.closeThread(threadId);
+      await this.deleteAdminNotifications(threadId);
 
       // Notify user
       try {

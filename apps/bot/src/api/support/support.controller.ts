@@ -126,6 +126,7 @@ export class SupportController {
     const threadId = BigInt(id);
     const thread = await this.supportRepo.findThreadById(threadId);
     if (!thread) throw new NotFoundException('Thread not found');
+    if (thread.status === 'closed') return { success: true };
 
     await this.supportRepo.closeThread(threadId);
 

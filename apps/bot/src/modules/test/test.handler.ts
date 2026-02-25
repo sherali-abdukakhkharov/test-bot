@@ -82,6 +82,9 @@ export class TestHandler implements OnModuleInit {
     // Show next question
     bot.callbackQuery('test_next', async (ctx) => {
       await ctx.answerCallbackQuery();
+      // Delete the triggering message (start prompt or answer feedback) so it
+      // cannot be pressed a second time and does not linger in the chat.
+      try { await ctx.deleteMessage(); } catch { /* already deleted */ }
       await this.sendCurrentQuestion(ctx);
     });
 
@@ -100,6 +103,10 @@ export class TestHandler implements OnModuleInit {
       const { params } = parseCb(ctx.callbackQuery.data);
       const questionId = parseInt(params[0], 10);
       const chosenOptionId = parseInt(params[1], 10);
+
+      // Guard: if this question was already answered (e.g. rapid double-tap),
+      // do nothing — the message was already edited to show the nav button.
+      if (await this.sessionRepo.hasAnswer(BigInt(sessionId), questionId)) return;
 
       const questionWithOpts = await this.questionRepo.findWithOptions(questionId);
       if (!questionWithOpts) {
@@ -186,6 +193,9 @@ export class TestHandler implements OnModuleInit {
       ctx.session.activeTestSessionId = undefined;
       ctx.session.questionIndex = undefined;
       ctx.session.questionIds = undefined;
+
+      // Remove the "🏁 Natijani ko'rish" button message so it can't be re-pressed.
+      try { await ctx.deleteMessage(); } catch { /* already deleted */ }
 
       const emoji = score >= 90 ? '🏆' : score >= 70 ? '🎉' : score >= 50 ? '😊' : '😔';
 
