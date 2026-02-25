@@ -20,5 +20,17 @@
       "Bash(npm create vite@latest apps/web -- --template react-ts --yes)",
       "Bash(timeout 8 npm run start:prod)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
   }
 }
