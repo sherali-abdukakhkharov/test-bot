@@ -11,6 +11,7 @@ import { AdminGuideHandler } from './guide/admin-guide.handler';
 import { AdminAnnouncementsHandler } from './announcements/admin-announcements.handler';
 import { AdminSupportHandler } from './support/admin-support.handler';
 import { AdminSettingsHandler } from './settings/admin-settings.handler';
+import { AdminDeployHandler } from './deploy/admin-deploy.handler';
 
 const HANDLERS = [
   AdminAuthHandler,
@@ -23,6 +24,7 @@ const HANDLERS = [
   AdminAnnouncementsHandler,
   AdminSupportHandler,
   AdminSettingsHandler,
+  AdminDeployHandler,
 ];
 
 @Module({
