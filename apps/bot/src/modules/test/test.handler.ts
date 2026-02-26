@@ -263,7 +263,7 @@ export class TestHandler implements OnModuleInit {
       // Store all needed data in session state
       ctx.session.activeTestSessionId = String(dbSession.id);
       ctx.session.questionIndex = 0;
-      ctx.session.questionIds = questions.map((q) => q.id);
+      ctx.session.questionIds = questions.map((q) => Number(q.id));
       ctx.session.timePerQuestionSec = topic.time_per_question_sec;
 
       await ctx.reply(
@@ -323,8 +323,8 @@ export class TestHandler implements OnModuleInit {
       // Stale-button guard: if session still has the question list, verify the index matches.
       // (Session may be absent if freeStorage fetch fails — in that case we trust the callback data.)
       const questionIds = ctx.session.questionIds ?? [];
-      if (questionIds.length > 0 && questionIds[questionIndex] !== questionId) {
-        this.logger.warn(`[ANSWER] stale button sid=${sessionId} qIdx=${questionIndex} expected=${questionIds[questionIndex]} got=${questionId}`);
+      if (questionIds.length > 0 && Number(questionIds[questionIndex]) !== questionId) {
+        this.logger.warn(`[ANSWER] stale button sid=${sessionId} qIdx=${questionIndex} expected=${Number(questionIds[questionIndex])} got=${questionId}`);
         return;
       }
 
