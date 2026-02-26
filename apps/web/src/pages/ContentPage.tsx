@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import type { SectionTreeNode, TopicDto } from '@arab-tili/shared-types'
-import { ChevronRight, ChevronDown, Plus, Edit2, Trash2, BookOpen } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit2, Trash2, BookOpen, Lock } from 'lucide-react'
 
 // ─── Section Tree ─────────────────────────────────────────────────────────────
 
@@ -13,12 +13,14 @@ function SectionNode({
   onSelect,
   onEdit,
   onDelete,
+  onAddChild,
 }: {
   node: SectionTreeNode
   selectedId: number | null
   onSelect: (id: number) => void
   onEdit: (node: SectionTreeNode) => void
   onDelete: (id: number) => void
+  onAddChild: (parentId: number) => void
 }) {
   const [open, setOpen] = useState(true)
   const hasChildren = node.children.length > 0
@@ -37,8 +39,12 @@ function SectionNode({
         >
           {hasChildren ? (open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />) : null}
         </button>
+        {node.isLockedByDefault && <Lock className="h-3 w-3 text-amber-500 shrink-0" />}
         <span className="flex-1 text-sm truncate">{node.title}</span>
         <div className="hidden group-hover:flex items-center gap-1">
+          <button onClick={(e) => { e.stopPropagation(); onAddChild(node.id) }} className="p-1 hover:text-green-600" title="Ichki bo'lim qo'shish">
+            <Plus className="h-3 w-3" />
+          </button>
           <button onClick={(e) => { e.stopPropagation(); onEdit(node) }} className="p-1 hover:text-blue-600">
             <Edit2 className="h-3 w-3" />
           </button>
@@ -57,6 +63,7 @@ function SectionNode({
               onSelect={onSelect}
               onEdit={onEdit}
               onDelete={onDelete}
+              onAddChild={onAddChild}
             />
           ))}
         </div>
@@ -70,15 +77,21 @@ function SectionNode({
 function SectionModal({
   initial,
   parentId,
+  allSections,
   onClose,
   onSave,
 }: {
   initial?: SectionTreeNode | null
   parentId?: number | null
+  allSections: { id: number; title: string }[]
   onClose: () => void
-  onSave: (data: { title: string; parentId?: number | null }) => void
+  onSave: (data: { title: string; parentId?: number | null; isLockedByDefault: boolean; unlockRequiredSection: number | null }) => void
 }) {
   const [title, setTitle] = useState(initial?.title ?? '')
+  const [locked, setLocked] = useState(initial?.isLockedByDefault ?? false)
+  const [prereq, setPrereq] = useState<number | null>(initial?.unlockRequiredSection ?? null)
+
+  const available = allSections.filter((s) => s.id !== initial?.id)
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -93,12 +106,29 @@ function SectionModal({
           className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           autoFocus
         />
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={locked} onChange={(e) => { setLocked(e.target.checked); if (!e.target.checked) setPrereq(null) }} />
+          <span>Qulflangan (foydalanuvchilar uchun)</span>
+        </label>
+        {locked && (
+          <div>
+            <label className="text-xs text-gray-500">Ochish uchun shart (bo'lim)</label>
+            <select
+              value={prereq ?? ''}
+              onChange={(e) => setPrereq(e.target.value ? Number(e.target.value) : null)}
+              className="w-full border rounded-lg px-2 py-1.5 text-sm mt-1"
+            >
+              <option value="">— Har doim qulflangan —</option>
+              {available.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+            </select>
+          </div>
+        )}
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
             Bekor
           </button>
           <button
-            onClick={() => { if (title.trim()) onSave({ title: title.trim(), parentId }) }}
+            onClick={() => { if (title.trim()) onSave({ title: title.trim(), parentId, isLockedByDefault: locked, unlockRequiredSection: prereq }) }}
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Saqlash
@@ -114,11 +144,13 @@ function SectionModal({
 function TopicModal({
   initial,
   sectionId,
+  allTopics,
   onClose,
   onSave,
 }: {
   initial?: TopicDto | null
   sectionId: number
+  allTopics: TopicDto[]
   onClose: () => void
   onSave: (data: Partial<TopicDto> & { sectionId: number }) => void
 }) {
@@ -126,6 +158,10 @@ function TopicModal({
   const [timePerQ, setTimePerQ] = useState(initial?.timePerQuestionSec ?? 30)
   const [opts, setOpts] = useState(initial?.optionsCount ?? 4)
   const [limit, setLimit] = useState(initial?.dailyAttemptLimit ?? 3)
+  const [locked, setLocked] = useState(initial?.isLockedByDefault ?? false)
+  const [prereq, setPrereq] = useState<number | null>(initial?.unlockRequiredTopic ?? null)
+
+  const available = allTopics.filter((t) => t.id !== initial?.id)
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -161,12 +197,29 @@ function TopicModal({
               className="w-full border rounded-lg px-2 py-1.5 text-sm mt-1" />
           </div>
         </div>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={locked} onChange={(e) => { setLocked(e.target.checked); if (!e.target.checked) setPrereq(null) }} />
+          <span>Qulflangan (foydalanuvchilar uchun)</span>
+        </label>
+        {locked && (
+          <div>
+            <label className="text-xs text-gray-500">Ochish uchun shart (mavzu)</label>
+            <select
+              value={prereq ?? ''}
+              onChange={(e) => setPrereq(e.target.value ? Number(e.target.value) : null)}
+              className="w-full border rounded-lg px-2 py-1.5 text-sm mt-1"
+            >
+              <option value="">— Har doim qulflangan —</option>
+              {available.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+            </select>
+          </div>
+        )}
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
             Bekor
           </button>
           <button
-            onClick={() => { if (title.trim()) onSave({ title: title.trim(), sectionId, timePerQuestionSec: timePerQ, optionsCount: opts, dailyAttemptLimit: limit }) }}
+            onClick={() => { if (title.trim()) onSave({ title: title.trim(), sectionId, timePerQuestionSec: timePerQ, optionsCount: opts, dailyAttemptLimit: limit, isLockedByDefault: locked, unlockRequiredTopic: prereq ?? undefined }) }}
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Saqlash
@@ -175,6 +228,12 @@ function TopicModal({
       </div>
     </div>
   )
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function flattenTree(nodes: SectionTreeNode[]): SectionTreeNode[] {
+  return nodes.flatMap((n) => [n, ...flattenTree(n.children)])
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -196,12 +255,19 @@ export default function ContentPage() {
     enabled: !!selectedSection,
   })
 
+  const { data: allTopics = [] } = useQuery<TopicDto[]>({
+    queryKey: ['topics-all'],
+    queryFn: () => api.get('/topics').then((r) => r.data),
+  })
+
+  const allSections = flattenTree(tree)
+
   const createSection = useMutation({
-    mutationFn: (d: { title: string; parentId?: number | null }) => api.post('/sections', d),
+    mutationFn: (d: { title: string; parentId?: number | null; isLockedByDefault: boolean; unlockRequiredSection: number | null }) => api.post('/sections', d),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['sections-tree'] }); setSectionModal(null) },
   })
   const updateSection = useMutation({
-    mutationFn: ({ id, ...d }: { id: number; title: string }) => api.patch(`/sections/${id}`, d),
+    mutationFn: ({ id, ...d }: { id: number; title: string; isLockedByDefault: boolean; unlockRequiredSection: number | null }) => api.patch(`/sections/${id}`, d),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['sections-tree'] }); setSectionModal(null) },
   })
   const deleteSection = useMutation({
@@ -211,10 +277,12 @@ export default function ContentPage() {
   const createTopic = useMutation({
     mutationFn: (d: Partial<TopicDto> & { sectionId: number }) => api.post('/topics', d),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['topics', selectedSection] }); setTopicModal(null) },
+    onError: () => alert("Mavzu saqlashda xatolik yuz berdi. Qaytadan urinib ko'ring."),
   })
   const updateTopic = useMutation({
-    mutationFn: ({ id, ...d }: Partial<TopicDto> & { id: number }) => api.patch(`/topics/${id}`, d),
+    mutationFn: ({ id, sectionId: _s, ...d }: Partial<TopicDto> & { id: number }) => api.patch(`/topics/${id}`, d),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['topics', selectedSection] }); setTopicModal(null) },
+    onError: () => alert("Mavzu saqlashda xatolik yuz berdi. Qaytadan urinib ko'ring."),
   })
   const deleteTopic = useMutation({
     mutationFn: (id: number) => api.delete(`/topics/${id}`),
@@ -243,6 +311,7 @@ export default function ContentPage() {
               onSelect={setSelectedSection}
               onEdit={(n) => setSectionModal({ mode: 'edit', node: n })}
               onDelete={(id) => { if (confirm("O'chirishni tasdiqlaysizmi?")) deleteSection.mutate(id) }}
+              onAddChild={(parentId) => setSectionModal({ mode: 'add', parentId })}
             />
           ))}
         </div>
@@ -277,6 +346,7 @@ export default function ContentPage() {
                   <th className="px-4 py-3 text-center">Savollar</th>
                   <th className="px-4 py-3 text-center">Vaqt</th>
                   <th className="px-4 py-3 text-center">Limit</th>
+                  <th className="px-4 py-3 text-center">Qulf</th>
                   <th className="px-4 py-3 text-right">Amallar</th>
                 </tr>
               </thead>
@@ -287,6 +357,7 @@ export default function ContentPage() {
                     <td className="px-4 py-3 text-center text-gray-600">{t.questionCount ?? 0}</td>
                     <td className="px-4 py-3 text-center text-gray-600">{t.timePerQuestionSec}s</td>
                     <td className="px-4 py-3 text-center text-gray-600">{t.dailyAttemptLimit}/kun</td>
+                    <td className="px-4 py-3 text-center">{t.isLockedByDefault ? <Lock className="h-3.5 w-3.5 text-amber-500 mx-auto" /> : <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <Link to={`/questions/${t.id}`} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
@@ -303,7 +374,7 @@ export default function ContentPage() {
                   </tr>
                 ))}
                 {topics.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400">Mavzular yo'q</td></tr>
+                  <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">Mavzular yo'q</td></tr>
                 )}
               </tbody>
             </table>
@@ -316,10 +387,11 @@ export default function ContentPage() {
         <SectionModal
           initial={sectionModal.node}
           parentId={sectionModal.parentId}
+          allSections={allSections}
           onClose={() => setSectionModal(null)}
           onSave={(d) => {
             if (sectionModal.mode === 'edit' && sectionModal.node) {
-              updateSection.mutate({ id: sectionModal.node.id, title: d.title })
+              updateSection.mutate({ id: sectionModal.node.id, title: d.title, isLockedByDefault: d.isLockedByDefault, unlockRequiredSection: d.unlockRequiredSection })
             } else {
               createSection.mutate(d)
             }
@@ -332,6 +404,7 @@ export default function ContentPage() {
         <TopicModal
           initial={topicModal.topic}
           sectionId={selectedSection}
+          allTopics={allTopics}
           onClose={() => setTopicModal(null)}
           onSave={(d) => {
             if (topicModal.mode === 'edit' && topicModal.topic) {

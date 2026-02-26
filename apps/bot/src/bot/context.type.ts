@@ -14,6 +14,8 @@ export interface SessionData {
   questionIndex?: number;
   /** Question IDs shuffled for session */
   questionIds?: number[];
+  /** Seconds allowed per question for the active test */
+  timePerQuestionSec?: number;
   /** Admin pending-input state (for multi-step admin flows) */
   adminStep?: string;
   /** Temp data for admin wizard flows */
