@@ -66,8 +66,11 @@ export class BotService implements OnModuleInit, OnApplicationShutdown {
       }
     });
 
-    // Start polling in the background
+    // Start polling in the background.
+    // drop_pending_updates: discard any commands queued while the bot was offline,
+    // which prevents replay loops (e.g. /deploy restarting itself indefinitely).
     this.bot.start({
+      drop_pending_updates: true,
       onStart: (info) => this.logger.log(`Bot @${info.username} started polling`),
     });
   }
