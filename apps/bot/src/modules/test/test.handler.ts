@@ -302,6 +302,13 @@ export class TestHandler implements OnModuleInit {
       // Guard: already answered (rapid tap or timer fired simultaneously)
       if (await this.sessionRepo.hasAnswer(BigInt(sessionId), questionId)) return;
 
+      // Derive the actual index of this question from the session list.
+      // ctx.session.questionIndex may be stale if a timer advanced the question
+      // without going through a grammY handler (timers can't update session state).
+      const questionIds = ctx.session.questionIds ?? [];
+      const actualIndex = questionIds.indexOf(questionId);
+      if (actualIndex === -1) return; // stale button from a different session
+
       const questionWithOpts = await this.questionRepo.findWithOptions(questionId);
       if (!questionWithOpts) {
         await ctx.reply('❌ Savol topilmadi.');
@@ -314,9 +321,8 @@ export class TestHandler implements OnModuleInit {
       if (!chosenOpt) { await ctx.reply('❌ Variant topilmadi.'); return; }
       if (!correctOpt) { await ctx.reply('❌ To\'g\'ri javob belgilanmagan. Admin bilan bog\'laning.'); return; }
 
-      // Cancel the expiry timer for this question
-      const currentIndex = ctx.session.questionIndex ?? 0;
-      this.clearTimer(sessionId, currentIndex);
+      // Cancel THIS question's expiry timer (keyed by actual index, not stale session index)
+      this.clearTimer(sessionId, actualIndex);
 
       // Record answer
       await this.sessionRepo.recordAnswer({
@@ -333,9 +339,9 @@ export class TestHandler implements OnModuleInit {
         ? '✅ <b>To\'g\'ri!</b>'
         : '❌ <b>Noto\'g\'ri!</b>';
 
-      // Advance session index
-      const questionIds = ctx.session.questionIds ?? [];
-      ctx.session.questionIndex = currentIndex + 1;
+      // Advance to the question after the one we just answered
+      const nextIndex = actualIndex + 1;
+      ctx.session.questionIndex = nextIndex;
 
       // Edit the message to show feedback (no navigation button — timer handles advance)
       await ctx.editMessageText(
@@ -346,7 +352,7 @@ export class TestHandler implements OnModuleInit {
       const feedbackMessageId = ctx.callbackQuery.message?.message_id;
       const chatId = ctx.chat?.id;
       if (feedbackMessageId && chatId) {
-        this.startFeedbackTimer(chatId, feedbackMessageId, sessionId, ctx.session.questionIndex, questionIds);
+        this.startFeedbackTimer(chatId, feedbackMessageId, sessionId, nextIndex, questionIds);
       }
     });
   }

@@ -85,12 +85,15 @@ function SectionModal({
   parentId?: number | null
   allSections: { id: number; title: string }[]
   onClose: () => void
-  onSave: (data: { title: string; parentId?: number | null; isLockedByDefault: boolean; unlockRequiredSection: number | null }) => void
+  onSave: (data: { title: string; parentId: number | null; isLockedByDefault: boolean; unlockRequiredSection: number | null }) => void
 }) {
   const [title, setTitle] = useState(initial?.title ?? '')
+  // When editing, default to the section's current parent; when adding a child, default to parentId prop
+  const [selectedParent, setSelectedParent] = useState<number | null>(initial?.parentId ?? parentId ?? null)
   const [locked, setLocked] = useState(initial?.isLockedByDefault ?? false)
   const [prereq, setPrereq] = useState<number | null>(initial?.unlockRequiredSection ?? null)
 
+  // Exclude self from parent and prerequisite options to prevent circular reference
   const available = allSections.filter((s) => s.id !== initial?.id)
 
   return (
@@ -106,6 +109,17 @@ function SectionModal({
           className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           autoFocus
         />
+        <div>
+          <label className="text-xs text-gray-500">Ota bo'lim</label>
+          <select
+            value={selectedParent ?? ''}
+            onChange={(e) => setSelectedParent(e.target.value ? Number(e.target.value) : null)}
+            className="w-full border rounded-lg px-2 py-1.5 text-sm mt-1"
+          >
+            <option value="">— Asosiy daraja (root) —</option>
+            {available.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+          </select>
+        </div>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input type="checkbox" checked={locked} onChange={(e) => { setLocked(e.target.checked); if (!e.target.checked) setPrereq(null) }} />
           <span>Qulflangan (foydalanuvchilar uchun)</span>
@@ -128,7 +142,7 @@ function SectionModal({
             Bekor
           </button>
           <button
-            onClick={() => { if (title.trim()) onSave({ title: title.trim(), parentId, isLockedByDefault: locked, unlockRequiredSection: prereq }) }}
+            onClick={() => { if (title.trim()) onSave({ title: title.trim(), parentId: selectedParent, isLockedByDefault: locked, unlockRequiredSection: prereq }) }}
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Saqlash
@@ -267,7 +281,7 @@ export default function ContentPage() {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['sections-tree'] }); setSectionModal(null) },
   })
   const updateSection = useMutation({
-    mutationFn: ({ id, ...d }: { id: number; title: string; isLockedByDefault: boolean; unlockRequiredSection: number | null }) => api.patch(`/sections/${id}`, d),
+    mutationFn: ({ id, ...d }: { id: number; title: string; parentId: number | null; isLockedByDefault: boolean; unlockRequiredSection: number | null }) => api.patch(`/sections/${id}`, d),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['sections-tree'] }); setSectionModal(null) },
   })
   const deleteSection = useMutation({
@@ -391,7 +405,7 @@ export default function ContentPage() {
           onClose={() => setSectionModal(null)}
           onSave={(d) => {
             if (sectionModal.mode === 'edit' && sectionModal.node) {
-              updateSection.mutate({ id: sectionModal.node.id, title: d.title, isLockedByDefault: d.isLockedByDefault, unlockRequiredSection: d.unlockRequiredSection })
+              updateSection.mutate({ id: sectionModal.node.id, title: d.title, parentId: d.parentId, isLockedByDefault: d.isLockedByDefault, unlockRequiredSection: d.unlockRequiredSection })
             } else {
               createSection.mutate(d)
             }
