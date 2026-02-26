@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InlineKeyboard } from 'grammy';
 import { BotService } from '@/bot/bot.service';
 import { TopicRepository } from '@/repositories/topic.repository';
@@ -21,6 +21,7 @@ interface TimerData {
 
 @Injectable()
 export class TestHandler implements OnModuleInit {
+  private readonly logger = new Logger(TestHandler.name);
   /** Active per-question expiry timers. Key: `${sessionId}-${questionIndex}` */
   private readonly questionTimers = new Map<string, NodeJS.Timeout>();
 
@@ -41,6 +42,7 @@ export class TestHandler implements OnModuleInit {
   private clearTimer(sessionId: string, index: number) {
     const key = this.timerKey(sessionId, index);
     const t = this.questionTimers.get(key);
+    this.logger.log(`[clearTimer] sid=${sessionId} index=${index} found=${!!t}`);
     if (t) { clearTimeout(t); this.questionTimers.delete(key); }
   }
 
@@ -57,6 +59,7 @@ export class TestHandler implements OnModuleInit {
   private startExpiryTimer(data: TimerData, timeoutSec: number) {
     const key = this.timerKey(data.sessionId, data.questionIndex);
     this.clearTimer(data.sessionId, data.questionIndex);
+    this.logger.log(`[expiryTimer] START sid=${data.sessionId} index=${data.questionIndex} timeout=${timeoutSec}s`);
 
     const t = setTimeout(async () => {
       this.questionTimers.delete(key);
@@ -65,6 +68,7 @@ export class TestHandler implements OnModuleInit {
         BigInt(data.sessionId),
         data.questionIds[data.questionIndex],
       );
+      this.logger.log(`[expiryTimer] FIRED sid=${data.sessionId} index=${data.questionIndex} alreadyAnswered=${alreadyAnswered}`);
       if (alreadyAnswered) return;
 
       const bot = this.botService.bot;
@@ -99,7 +103,9 @@ export class TestHandler implements OnModuleInit {
     nextIndex: number,
     questionIds: number[],
   ) {
+    this.logger.log(`[feedbackTimer] START sid=${sessionId} nextIndex=${nextIndex}`);
     setTimeout(async () => {
+      this.logger.log(`[feedbackTimer] FIRED sid=${sessionId} nextIndex=${nextIndex}`);
       const bot = this.botService.bot;
       await bot.api.deleteMessage(chatId, feedbackMessageId).catch(() => undefined);
 
@@ -133,6 +139,7 @@ export class TestHandler implements OnModuleInit {
     if (index >= questionIds.length) return;
 
     const questionId = questionIds[index];
+    this.logger.log(`[sendQ] sid=${sessionId} index=${index}/${questionIds.length} questionId=${questionId}`);
     const question = await this.questionRepo.findWithOptions(questionId);
     if (!question) return;
 
@@ -146,7 +153,8 @@ export class TestHandler implements OnModuleInit {
 
     const kb = new InlineKeyboard();
     shuffled.forEach((opt, i) => {
-      kb.text(letters[i], cbData(CB.ANSWER, question.id, opt.id));
+      // Encode question index so the ANSWER handler doesn't need indexOf on session data
+      kb.text(letters[i], cbData(CB.ANSWER, index, question.id, opt.id));
     });
 
     const bot = this.botService.bot;
@@ -180,10 +188,11 @@ export class TestHandler implements OnModuleInit {
     const answers = await this.sessionRepo.getAnswers(BigInt(sessionId));
     const correctCount = answers.filter((a) => a.is_correct).length;
     const total = answers.length;
+    const score = total > 0 ? (correctCount / total) * 100 : 0;
+    this.logger.log(`[autoFinish] sid=${sessionId} correct=${correctCount}/${total} score=${score.toFixed(1)}%`);
 
     await this.sessionRepo.complete(BigInt(sessionId), correctCount, total);
 
-    const score = total > 0 ? (correctCount / total) * 100 : 0;
     const session = await this.sessionRepo.findById(BigInt(sessionId));
 
     if (session && score >= 90) {
@@ -245,6 +254,7 @@ export class TestHandler implements OnModuleInit {
         await ctx.reply('❌ Bu mavzuda savollar topilmadi.');
         return;
       }
+      this.logger.log(`[START_TEST] userId=${user.id} topicId=${topicId} questionCount=${questions.length}`);
 
       // Create session
       const dbSession = await this.sessionRepo.create(user.id, topicId, questions.length);
@@ -296,18 +306,27 @@ export class TestHandler implements OnModuleInit {
       }
 
       const { params } = parseCb(ctx.callbackQuery.data);
-      const questionId = parseInt(params[0], 10);
-      const chosenOptionId = parseInt(params[1], 10);
+      // Callback format: ans:<questionIndex>:<questionId>:<optionId>
+      // Index is embedded in callback data — no session lookup needed.
+      const questionIndex = parseInt(params[0], 10);
+      const questionId = parseInt(params[1], 10);
+      const chosenOptionId = parseInt(params[2], 10);
+
+      this.logger.log(`[ANSWER] sid=${sessionId} qIdx=${questionIndex} questionId=${questionId} optId=${chosenOptionId}`);
 
       // Guard: already answered (rapid tap or timer fired simultaneously)
-      if (await this.sessionRepo.hasAnswer(BigInt(sessionId), questionId)) return;
+      if (await this.sessionRepo.hasAnswer(BigInt(sessionId), questionId)) {
+        this.logger.warn(`[ANSWER] already answered sid=${sessionId} questionId=${questionId}, skipping`);
+        return;
+      }
 
-      // Derive the actual index of this question from the session list.
-      // ctx.session.questionIndex may be stale if a timer advanced the question
-      // without going through a grammY handler (timers can't update session state).
+      // Stale-button guard: if session still has the question list, verify the index matches.
+      // (Session may be absent if freeStorage fetch fails — in that case we trust the callback data.)
       const questionIds = ctx.session.questionIds ?? [];
-      const actualIndex = questionIds.indexOf(questionId);
-      if (actualIndex === -1) return; // stale button from a different session
+      if (questionIds.length > 0 && questionIds[questionIndex] !== questionId) {
+        this.logger.warn(`[ANSWER] stale button sid=${sessionId} qIdx=${questionIndex} expected=${questionIds[questionIndex]} got=${questionId}`);
+        return;
+      }
 
       const questionWithOpts = await this.questionRepo.findWithOptions(questionId);
       if (!questionWithOpts) {
@@ -321,8 +340,8 @@ export class TestHandler implements OnModuleInit {
       if (!chosenOpt) { await ctx.reply('❌ Variant topilmadi.'); return; }
       if (!correctOpt) { await ctx.reply('❌ To\'g\'ri javob belgilanmagan. Admin bilan bog\'laning.'); return; }
 
-      // Cancel THIS question's expiry timer (keyed by actual index, not stale session index)
-      this.clearTimer(sessionId, actualIndex);
+      // Cancel THIS question's expiry timer using the index from the callback
+      this.clearTimer(sessionId, questionIndex);
 
       // Record answer
       await this.sessionRepo.recordAnswer({
@@ -340,7 +359,7 @@ export class TestHandler implements OnModuleInit {
         : '❌ <b>Noto\'g\'ri!</b>';
 
       // Advance to the question after the one we just answered
-      const nextIndex = actualIndex + 1;
+      const nextIndex = questionIndex + 1;
       ctx.session.questionIndex = nextIndex;
 
       // Edit the message to show feedback (no navigation button — timer handles advance)
